@@ -89,14 +89,12 @@ export const TimelineRow: React.FC<TimelineRowProps> = ({
           assignedTasks.map((task, idx) => (
             <div
               key={`${task.id}-${idx}`}
-              className="flex-1 h-full rounded-md flex flex-row items-center justify-center text-[10px] font-semibold truncate px-1 shadow-sm leading-none transition-all hover:-translate-y-0.5 border border-black/5 animate-in fade-in zoom-in-75 duration-300 ease-out gap-1"
+              className="flex-1 h-full rounded-md flex flex-row items-center justify-center text-[10px] font-semibold truncate px-1 leading-none transition-all animate-in fade-in zoom-in-75 duration-300 ease-out gap-1"
               style={{ 
                 backgroundColor: task.color, 
                 color: getContrastColor(task.color) 
               }}
             >
-               {/* Gloss */}
-               <div className="absolute inset-0 rounded-md bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
               <span className={cn("truncate relative z-10")}>{task.name}</span>
               {showDuration && assignedTasks.length > 1 && <span className="text-[8px] opacity-80 font-normal font-mono relative z-10 hidden sm:inline">{durationText}</span>}
             </div>

@@ -1,16 +1,17 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import { Task, DayData, HOURS } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from 'recharts';
-import { Calendar, TrendingUp, ChevronLeft, PieChart, BarChart3 } from 'lucide-react';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, format, isSameDay, getDate } from 'date-fns';
+import { Calendar, TrendingUp, ChevronLeft, PieChart, Target } from 'lucide-react';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, format, isSameDay } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { formatDate, cn } from '../utils';
 
 interface StatsViewProps {
   tasks: Task[];
-  scheduleData: DayData;
+  scheduleData: DayData; // Already merged current day
   recordData: DayData;
-  allSchedules: Record<string, DayData>;
+  allSchedules: Record<string, DayData>; // Raw schedules
+  recurringSchedule: Record<number, string[]>; // Recurring rules
   allRecords: Record<string, DayData>;
   review: string;
   onUpdateReview: (text: string) => void;
@@ -25,14 +26,23 @@ export const StatsView: React.FC<StatsViewProps> = ({
   scheduleData,
   recordData,
   allSchedules,
+  recurringSchedule,
   allRecords,
   dateObj
 }) => {
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('none');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (scrollRef.current) {
+        // Scroll to 5 AM. Each row is h-5 (20px). 5 * 20 = 100.
+        scrollRef.current.scrollTop = 100;
+    }
+  }, []);
 
   const getTaskColor = (id: string) => tasks.find(t => t.id === id)?.color || '#e5e7eb';
 
-  // Daily Stats for the current day (Main View)
+  // Daily Stats for the current day (Main View - Plan vs Actual)
   const dailyStats = useMemo(() => {
     const plannedCounts: Record<string, number> = {};
     const actualCounts: Record<string, number> = {};
@@ -42,7 +52,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
         planned.forEach(tid => plannedCounts[tid] = (plannedCounts[tid] || 0) + 1);
 
         const actual = recordData.hours[h] || [];
-        // If multiple tasks in one hour, split the hour
+        // If multiple tasks in one hour, split the hour for duration calculations
         actual.forEach(tid => actualCounts[tid] = (actualCounts[tid] || 0) + (1 / (actual.length || 1))); 
     });
 
@@ -82,21 +92,28 @@ export const StatsView: React.FC<StatsViewProps> = ({
     }
 
     const days = eachDayOfInterval({ start, end });
+    const daysCount = days.length;
 
-    // 1. Chart Data: Daily Adherence Scores
+    // 1. Chart Data: Daily Plan Adherence Scores (Plan vs Record)
+    // This calculates how well the user followed the schedule, regardless of targets.
     const scores = days.map(day => {
         const dKey = formatDate(day);
-        const sched = allSchedules[dKey]?.hours || {};
+        const schedRaw = allSchedules[dKey]?.hours || {};
         const rec = allRecords[dKey]?.hours || {};
 
         let totalPlannedSlots = 0;
         let completedSlots = 0;
 
         HOURS.forEach(h => {
-            const pTasks = sched[h] || [];
+            // Merge Recurring + Specific for this historical calculation
+            const recTasks = recurringSchedule[h] || [];
+            const specTasks = schedRaw[h] || [];
+            const pTasks = Array.from(new Set([...recTasks, ...specTasks]));
+
             const rTasks = rec[h] || [];
             if (pTasks.length > 0) {
                 totalPlannedSlots += pTasks.length;
+                // Simple strict match check: if planned task is in recorded tasks for that hour
                 const matches = pTasks.filter(pid => rTasks.includes(pid)).length;
                 completedSlots += matches;
             }
@@ -113,54 +130,71 @@ export const StatsView: React.FC<StatsViewProps> = ({
         };
     });
 
-    // 2. Task Summaries: Cumulative Durations
-    const taskMap = new Map<string, { planned: number, actual: number }>();
-    
-    days.forEach(day => {
-        const dKey = formatDate(day);
-        const sched = allSchedules[dKey]?.hours || {};
-        const rec = allRecords[dKey]?.hours || {};
-
-        HOURS.forEach(h => {
-             // Planned Hours
-             (sched[h] || []).forEach(tid => {
-                 const curr = taskMap.get(tid) || { planned: 0, actual: 0 };
-                 curr.planned += 1;
-                 taskMap.set(tid, curr);
-             });
-             // Actual Hours
-             const actuals = rec[h] || [];
-             if (actuals.length > 0) {
-                 const val = 1 / actuals.length;
-                 actuals.forEach(tid => {
-                     const curr = taskMap.get(tid) || { planned: 0, actual: 0 };
-                     curr.actual += val;
-                     taskMap.set(tid, curr);
-                 });
-             }
-        });
-    });
-
+    // 2. Task Summaries: Target Completion Rate (Target vs Actual Record)
+    // This logic adapts to Count vs Duration modes.
     const summaries = tasks.map(t => {
-        const data = taskMap.get(t.id) || { planned: 0, actual: 0 };
-        const plannedHours = data.planned;
-        const actualHours = parseFloat(data.actual.toFixed(1));
+        const mode = t.targets?.mode || 'duration';
+        let actualTotal = 0;
+
+        // Sum actuals over the period
+        days.forEach(day => {
+            const dKey = formatDate(day);
+            const rec = allRecords[dKey]?.hours || {};
+            
+            HOURS.forEach(h => {
+                const ids = rec[h] || [];
+                if (ids.includes(t.id)) {
+                    if (mode === 'count') {
+                        actualTotal += 1;
+                    } else {
+                        // duration mode: split hour if shared
+                        actualTotal += (1 / ids.length);
+                    }
+                }
+            });
+        });
+
+        // Calculate Target for this specific period
+        let periodTarget = 0;
+        const targetConfig = t.targets;
         
+        if (targetConfig && targetConfig.value > 0 && targetConfig.frequency > 0) {
+            // Formula: (TargetValue / FrequencyDays) * DaysInView
+            // e.g., Target 5 times every 7 days. View is 7 days. Target = 5.
+            // e.g., Target 1 hour every 1 day. View is 30 days. Target = 30.
+            periodTarget = (targetConfig.value / targetConfig.frequency) * daysCount;
+        }
+
+        // Formatting
+        const formattedActual = mode === 'count' ? actualTotal : parseFloat(actualTotal.toFixed(1));
+        const formattedTarget = mode === 'count' ? Math.round(periodTarget) : parseFloat(periodTarget.toFixed(1));
+        
+        // Completion Rate
+        let completionRate = 0;
+        if (formattedTarget > 0) {
+            completionRate = Math.min(Math.round((formattedActual / formattedTarget) * 100), 100);
+        } else if (formattedActual > 0) {
+            completionRate = 100; // No target but has activity
+        }
+
         return {
             ...t,
-            totalPlanned: plannedHours,
-            totalActual: actualHours,
-            delta: parseFloat((actualHours - plannedHours).toFixed(1))
+            actualTotal: formattedActual,
+            periodTarget: formattedTarget,
+            completionRate,
+            unit: mode === 'count' ? '次' : 'h',
+            hasTarget: formattedTarget > 0
         };
     })
-    .filter(t => t.totalPlanned > 0 || t.totalActual > 0)
-    .sort((a, b) => b.totalActual - a.totalActual);
+    .filter(t => t.actualTotal > 0 || t.hasTarget) // Show tasks with activity or targets
+    .sort((a, b) => b.completionRate - a.completionRate);
 
+    // Average Score refers to Plan Execution Rate
     const activeDays = scores.filter(d => d.hasPlan);
     const avg = activeDays.length > 0 ? Math.round(activeDays.reduce((a, b) => a + b.score, 0) / activeDays.length) : 0;
 
     return { chartData: scores, taskSummaries: summaries, averageScore: avg, title: titleText };
-  }, [analysisMode, dateObj, allSchedules, allRecords, tasks]);
+  }, [analysisMode, dateObj, allSchedules, recurringSchedule, allRecords, tasks]);
 
   // Analysis View Render
   if (analysisMode !== 'none') {
@@ -205,14 +239,14 @@ export const StatsView: React.FC<StatsViewProps> = ({
 
                   <div className="flex items-end gap-3 text-stone-600 pl-1">
                       <span className="text-6xl font-bold text-primary tracking-tighter leading-none">{averageScore}<span className="text-3xl">%</span></span>
-                      <span className="text-sm font-medium bg-stone-100 text-stone-500 px-3 py-1 rounded-full mb-1">平均达成率</span>
+                      <span className="text-sm font-medium bg-stone-100 text-stone-500 px-3 py-1 rounded-full mb-1">计划执行率</span>
                   </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 custom-scrollbar">
                   {/* Chart */}
                   <div className="bg-white p-6 rounded-[2rem] shadow-sm h-64 w-full border border-stone-50">
-                      <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-4">执行趋势</h3>
+                      <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-4">执行趋势 (日程 vs 记录)</h3>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={chartData} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f4" />
@@ -241,8 +275,8 @@ export const StatsView: React.FC<StatsViewProps> = ({
 
                   {/* Task Breakdown List */}
                   <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-stone-50">
-                      <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-4">各任务累计时长</h3>
-                      <div className="space-y-3">
+                      <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-4">目标完成率 (目标 vs 记录)</h3>
+                      <div className="space-y-4">
                           {taskSummaries.map(t => (
                               <div key={t.id} className="flex flex-col gap-1.5 pb-2 border-b border-stone-50 last:border-0">
                                   <div className="flex justify-between items-center">
@@ -250,20 +284,34 @@ export const StatsView: React.FC<StatsViewProps> = ({
                                           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
                                           <span className="text-xs font-bold text-stone-700">{t.name}</span>
                                       </div>
-                                      <div className="text-[10px] font-mono text-stone-400">
-                                          <span className="text-stone-600 font-bold">{t.totalActual}h</span> / {t.totalPlanned}h
+                                      <div className="text-[10px] font-mono flex items-center gap-1.5">
+                                          <span className="text-stone-600 font-bold">{t.actualTotal}{t.unit}</span>
+                                          {t.hasTarget && (
+                                            <>
+                                              <span className="text-stone-300">/</span>
+                                              <span className="text-stone-400">{t.periodTarget}{t.unit}</span>
+                                            </>
+                                          )}
                                       </div>
                                   </div>
+                                  
                                   {/* Progress bar for plan vs actual */}
-                                  <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden flex relative">
-                                      <div className="absolute top-0 left-0 h-full bg-stone-200 z-0" style={{ width: '100%' }} />
-                                      <div 
-                                        className="h-full z-10 rounded-full" 
-                                        style={{ 
-                                            width: `${Math.min((t.totalActual / (Math.max(t.totalPlanned, t.totalActual, 1))) * 100, 100)}%`,
-                                            backgroundColor: t.color
-                                        }} 
-                                      />
+                                  <div className="relative">
+                                     <div className="h-1.5 w-full bg-stone-100 rounded-full overflow-hidden flex relative">
+                                        <div className="absolute top-0 left-0 h-full bg-stone-200 z-0" style={{ width: '100%' }} />
+                                        <div 
+                                            className="h-full z-10 rounded-full transition-all duration-500" 
+                                            style={{ 
+                                                width: `${t.completionRate}%`,
+                                                backgroundColor: t.color
+                                            }} 
+                                        />
+                                     </div>
+                                     {t.hasTarget && (
+                                         <span className="absolute right-0 -top-4 text-[9px] font-bold text-stone-400">
+                                             {t.completionRate}%
+                                         </span>
+                                     )}
                                   </div>
                               </div>
                           ))}
@@ -295,7 +343,10 @@ export const StatsView: React.FC<StatsViewProps> = ({
                  </div>
              </div>
 
-             <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+             <div 
+                ref={scrollRef}
+                className="flex-1 overflow-y-auto custom-scrollbar relative"
+             >
                 <div className="flex min-h-full">
                     {/* Plan Column */}
                     <div className="flex-1 border-r border-stone-50 bg-white">
@@ -303,11 +354,11 @@ export const StatsView: React.FC<StatsViewProps> = ({
                         {HOURS.map(h => {
                             const tIds = scheduleData.hours[h] || [];
                             return (
-                                <div key={h} className="h-7 border-b border-stone-50/50 flex items-center px-1.5 relative group">
+                                <div key={h} className="h-5 border-b border-stone-50/50 flex items-center px-1.5 relative group">
                                     <span className="w-5 text-[8px] text-stone-300 font-mono flex-shrink-0 text-center">{h}</span>
-                                    <div className="flex-1 flex h-full py-[3px] gap-[2px]">
+                                    <div className="flex-1 flex h-full py-0.5 gap-[2px]">
                                         {tIds.map((tid, i) => (
-                                            <div key={i} className="flex-1 rounded-[4px] opacity-90" style={{ backgroundColor: getTaskColor(tid) }} />
+                                            <div key={i} className="flex-1 rounded-[2px]" style={{ backgroundColor: getTaskColor(tid) }} />
                                         ))}
                                     </div>
                                 </div>
@@ -322,10 +373,10 @@ export const StatsView: React.FC<StatsViewProps> = ({
                         {HOURS.map(h => {
                             const tIds = recordData.hours[h] || [];
                             return (
-                                <div key={h} className="h-7 border-b border-stone-50/50 flex items-center px-1.5">
-                                    <div className="flex-1 flex h-full py-[3px] gap-[2px]">
+                                <div key={h} className="h-5 border-b border-stone-50/50 flex items-center px-1.5">
+                                    <div className="flex-1 flex h-full py-0.5 gap-[2px]">
                                         {tIds.map((tid, i) => (
-                                            <div key={i} className="flex-1 rounded-[4px]" style={{ backgroundColor: getTaskColor(tid) }} />
+                                            <div key={i} className="flex-1 rounded-[2px]" style={{ backgroundColor: getTaskColor(tid) }} />
                                         ))}
                                     </div>
                                 </div>

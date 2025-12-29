@@ -1,12 +1,15 @@
 import React from 'react';
 import { Task } from '../types';
 import { getContrastColor, cn } from '../utils';
-import { Edit2 } from 'lucide-react';
+import { Edit2, Target } from 'lucide-react';
 
 interface TaskBlockProps {
   task: Task;
   onClick?: () => void;
   onDoubleClick?: () => void;
+  onPointerDown?: (e: React.PointerEvent) => void;
+  onPointerUp?: (e: React.PointerEvent) => void;
+  onPointerLeave?: (e: React.PointerEvent) => void;
   selected?: boolean;
   className?: string;
   showEditIcon?: boolean;
@@ -20,6 +23,9 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
   task, 
   onClick, 
   onDoubleClick, 
+  onPointerDown,
+  onPointerUp,
+  onPointerLeave,
   selected, 
   className,
   showEditIcon = false,
@@ -30,6 +36,9 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
 }) => {
   const textColor = getContrastColor(task.color);
   
+  // Check if task has valid target set (handling legacy 'duration' or new 'value')
+  const hasTargets = task.targets && (task.targets.value > 0 || (task.targets as any).duration > 0);
+
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
     if (onDragStart) {
       onDragStart(e, task);
@@ -42,10 +51,14 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
     <div
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerLeave}
       draggable={draggable}
       onDragStart={handleDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
+      onContextMenu={(e) => e.preventDefault()} // Prevent native context menu on long press
       className={cn(
         "relative group flex items-center justify-between px-2.5 py-2 rounded-lg transition-all duration-200 cursor-pointer select-none",
         selected ? "ring-2 ring-offset-1 ring-primary shadow-md scale-[1.02]" : "hover:scale-[1.01] hover:shadow-sm",
@@ -54,7 +67,7 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
       )}
       style={{ backgroundColor: task.color }}
     >
-      <div className="flex items-center gap-2 overflow-hidden">
+      <div className="flex items-center gap-2 overflow-hidden flex-1">
         <span 
             className="font-bold text-[11px] truncate leading-tight tracking-wide"
             style={{ color: textColor }}
@@ -63,16 +76,22 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
         </span>
       </div>
       
-      {showEditIcon && (
-        <div 
-            className={cn(
-                "opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded-full",
-                textColor === '#ffffff' ? "hover:bg-white/20" : "hover:bg-black/10"
-            )}
-        >
-             <Edit2 size={10} color={textColor} />
-        </div>
-      )}
+      <div className="flex items-center gap-1">
+        {hasTargets && (
+            <Target size={10} color={textColor} className="opacity-60" />
+        )}
+        
+        {showEditIcon && (
+            <div 
+                className={cn(
+                    "opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded-full",
+                    textColor === '#ffffff' ? "hover:bg-white/20" : "hover:bg-black/10"
+                )}
+            >
+                <Edit2 size={10} color={textColor} />
+            </div>
+        )}
+      </div>
       
       {/* Selection Indicator Dot */}
       {selected && (

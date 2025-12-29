@@ -2,7 +2,7 @@ import { AppState, Task } from '../types';
 
 const STORAGE_KEY = 'chronos_flow_data_v1';
 
-const DEFAULT_TASKS: Task[] = [
+export const DEFAULT_TASKS: Task[] = [
   { id: 't1', name: '睡眠', color: '#94a3b8', category: '生活' },
   { id: 't2', name: '工作', color: '#3b82f6', category: '工作' },
   { id: 't3', name: '运动', color: '#10b981', category: '健康' },
@@ -17,16 +17,23 @@ export const loadState = (): AppState => {
       return {
         tasks: DEFAULT_TASKS,
         schedule: {},
+        recurringSchedule: {},
         records: {},
         reviews: {}
       };
     }
-    return JSON.parse(serialized);
+    const parsed = JSON.parse(serialized);
+    // Ensure recurringSchedule exists for older data migrations
+    if (!parsed.recurringSchedule) {
+        parsed.recurringSchedule = {};
+    }
+    return parsed;
   } catch (e) {
     console.error("Failed to load state", e);
     return {
       tasks: DEFAULT_TASKS,
       schedule: {},
+      recurringSchedule: {},
       records: {},
       reviews: {}
     };
