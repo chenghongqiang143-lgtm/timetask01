@@ -87,7 +87,16 @@ export const RecordView: React.FC<RecordViewProps> = ({
         </div>
         <div className="pt-1">
           {HOURS.map(hour => (
-            <TimelineRow key={hour} hour={hour} assignedTaskIds={dayData.hours[hour] || []} allTasks={tasks} onClick={handleHourClick} showDuration={true} />
+            // Fix: Updated TimelineRow props to match the component's expected interface
+            <TimelineRow 
+              key={hour} 
+              hour={hour} 
+              assignedScheduleIds={[]} 
+              assignedRecordIds={dayData.hours[hour] || []} 
+              allTasks={tasks} 
+              onScheduleClick={() => {}}
+              onRecordClick={handleHourClick} 
+            />
           ))}
         </div>
       </div>

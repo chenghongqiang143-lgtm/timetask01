@@ -4,7 +4,7 @@ import { Task, DayData, HOURS } from '../types';
 import { TimelineRow } from '../components/TimelineRow';
 import { TaskEditorModal } from '../components/TaskEditorModal';
 import { cn, formatDate } from '../utils';
-import { ChevronRight, ChevronLeft, Repeat, Check, X, Eraser } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Repeat, Check, X, Eraser, LayoutGrid, Target, Clock, TrendingUp } from 'lucide-react';
 import { subDays, eachDayOfInterval } from 'date-fns';
 
 interface TrackerViewProps {
@@ -14,6 +14,7 @@ interface TrackerViewProps {
   recordData: DayData;
   recurringData: Record<number, string[]>;
   allRecords: Record<string, DayData>;
+  allSchedules: Record<string, DayData>;
   onUpdateSchedule: (hour: number, taskIds: string[]) => void;
   onUpdateRecord: (hour: number, taskIds: string[]) => void;
   onUpdateRecurring: (hour: number, taskIds: string[]) => void;
@@ -29,6 +30,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   recordData,
   recurringData,
   allRecords,
+  allSchedules,
   onUpdateSchedule,
   onUpdateRecord,
   onUpdateRecurring,
@@ -40,12 +42,30 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isRepeatMode, setIsRepeatMode] = useState(false);
   const [activeSlot, setActiveSlot] = useState<{ hour: number, type: 'schedule' | 'record' } | null>(null);
-  const [sidebar, setSidebar] = useState<'none' | 'left' | 'right'>('none');
+  const [sidebar, setSidebar] = useState<'none' | 'task'>('none');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 180;
   }, []);
+
+  const todayStats = useMemo(() => {
+    const dKey = formatDate(currentDate);
+    const recHours = allRecords[dKey]?.hours || {};
+    
+    return tasks.map(t => {
+      let actual = 0;
+      HOURS.forEach(h => {
+        const actualRec = recHours[h] || [];
+        if (actualRec.includes(t.id)) actual += (1 / actualRec.length);
+      });
+      
+      const targetVal = t.targets?.value || 0;
+      const progress = targetVal > 0 ? (actual / targetVal) * 100 : 0;
+      
+      return { ...t, actual, targetVal, progress };
+    }).filter(t => t.actual > 0 || t.targetVal > 0).sort((a, b) => b.actual - a.actual);
+  }, [currentDate, allRecords, tasks]);
 
   const getTaskProgress = (task: Task) => {
     if (!task.targets || !task.targets.value) return null;
@@ -91,25 +111,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     }
   };
 
-  const clearActiveSlot = () => {
-    if (!activeSlot) return;
-    const { hour, type } = activeSlot;
-    if (type === 'schedule') {
-        if (isRepeatMode) onUpdateRecurring(hour, []);
-        else onUpdateSchedule(hour, []);
-    } else {
-        onUpdateRecord(hour, []);
-    }
-  };
-
   const handleScheduleClick = (hour: number) => {
     setActiveSlot({ hour, type: 'schedule' });
-    setSidebar('right');
+    setSidebar('task');
   };
 
   const handleRecordClick = (hour: number) => {
     setActiveSlot({ hour, type: 'record' });
-    setSidebar('left');
+    setSidebar('task');
   };
 
   const sortedCategories = useMemo(() => {
@@ -119,46 +128,73 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     return [...ordered, ...others];
   }, [tasks, categoryOrder]);
 
-  const isTaskInActiveSlot = (taskId: string) => {
-    if (!activeSlot) return false;
-    const { hour, type } = activeSlot;
-    if (type === 'schedule') {
-      const list = isRepeatMode ? (recurringData[hour] || []) : (scheduleData.hours[hour] || []);
-      return list.includes(taskId);
-    } else {
-      const list = recordData.hours[hour] || [];
-      return list.includes(taskId);
-    }
-  };
+  const StatsPanel = () => (
+    <div className="flex flex-col h-full bg-stone-50/50 p-5 overflow-y-auto custom-scrollbar">
+       <div className="flex items-center gap-2 mb-5">
+          <TrendingUp size={16} className="text-primary" />
+          <h3 className="text-[11px] font-black text-stone-800 uppercase tracking-widest">今日看板</h3>
+       </div>
+       <div className="space-y-5">
+          {todayStats.map(stat => (
+            <div key={stat.id} className="bg-white p-3.5 rounded-2xl border border-stone-100 shadow-sm transition-transform hover:scale-[1.02]">
+               <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: stat.color }} />
+                      <span className="text-[12px] font-bold text-stone-700">{stat.name}</span>
+                  </div>
+                  <span className="text-[11px] font-mono font-black text-stone-400">
+                    {stat.actual.toFixed(1)}<span className="text-[9px] opacity-50 ml-0.5">h</span>
+                  </span>
+               </div>
+               <div className="h-2 bg-stone-50 rounded-full overflow-hidden border border-stone-50">
+                  <div 
+                    className="h-full rounded-full transition-all duration-700 ease-out" 
+                    style={{ width: `${Math.min(stat.progress || (stat.actual/12)*100, 100)}%`, backgroundColor: stat.color }} 
+                  />
+               </div>
+            </div>
+          ))}
+          {todayStats.length === 0 && (
+             <div className="text-center py-16 flex flex-col items-center gap-3">
+                <Clock size={24} className="text-stone-200" />
+                <p className="text-[10px] font-bold text-stone-300 italic">今日尚未记录活动</p>
+             </div>
+          )}
+       </div>
+    </div>
+  );
 
   const TaskPool = () => (
-    <div className="flex-1 overflow-y-auto px-2 pb-32 space-y-3 pt-2">
+    <div className="flex-1 overflow-y-auto px-4 pb-32 space-y-4 pt-4">
       {sortedCategories.map(cat => (
-        <div key={cat} className="space-y-1">
-          <div className="flex items-center gap-1.5 px-1 opacity-70">
-            <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest">{cat}</span>
+        <div key={cat} className="space-y-2">
+          <div className="flex items-center gap-2 px-1 opacity-70">
+            <span className="text-[9px] font-black text-stone-400 uppercase tracking-widest">{cat}</span>
             <div className="h-px flex-1 bg-stone-100" />
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             {tasks.filter(t => (t.category || '未分类') === cat).map(task => {
-              const isSelected = isTaskInActiveSlot(task.id);
+              const list = activeSlot?.type === 'schedule' 
+                ? (isRepeatMode ? (recurringData[activeSlot.hour] || []) : (scheduleData.hours[activeSlot.hour] || []))
+                : (recordData.hours[activeSlot?.hour || 0] || []);
+              const isSelected = list.includes(task.id);
               const progress = getTaskProgress(task);
               
               return (
                 <div 
                   key={task.id} 
                   onClick={() => handleTaskToggle(task.id)}
-                  onDoubleClick={() => { setEditingTask(task); setIsEditModalOpen(true); }}
                   className={cn(
-                    "group p-2 rounded-lg border transition-all cursor-pointer relative overflow-hidden flex flex-col items-start justify-center min-h-[44px] select-none shadow-sm",
+                    "group p-2.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col items-start justify-center min-h-[48px] select-none shadow-sm",
                     isSelected 
-                        ? "bg-white border-primary ring-1 ring-primary/10" 
-                        : "bg-white border-stone-100 hover:border-stone-200"
+                        ? "bg-stone-900 border-stone-900 shadow-lg" 
+                        : "bg-white border-stone-100 hover:border-stone-300"
                   )}
                 >
-                  {progress && (
+                  {/* Integrated Progress Fill */}
+                  {progress && !isSelected && (
                     <div 
-                      className="absolute left-0 top-0 bottom-0 transition-all duration-700 ease-out z-0 opacity-10"
+                      className="absolute left-0 top-0 bottom-0 opacity-10 transition-all duration-500 ease-out z-0"
                       style={{ 
                         width: `${progress.percentage}%`, 
                         backgroundColor: task.color 
@@ -166,24 +202,23 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     />
                   )}
 
-                  <div className="flex items-center gap-1.5 w-full relative z-10">
+                  <div className="flex items-center gap-2 w-full relative z-10">
                     <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: task.color }} />
                     <span className={cn(
-                        "text-[11px] font-bold leading-tight truncate flex-1",
-                        isSelected ? "text-primary" : "text-stone-700"
+                        "text-[12px] font-bold leading-tight truncate flex-1",
+                        isSelected ? "text-white" : "text-stone-700"
                     )}>{task.name}</span>
+                    
+                    {progress && (
+                      <span className={cn(
+                        "text-[8px] font-mono font-black shrink-0 ml-1 opacity-60",
+                        isSelected ? "text-white/70" : "text-stone-400"
+                      )}>
+                        {Math.round(progress.percentage)}%
+                      </span>
+                    )}
                   </div>
-
-                  <div className="flex items-center justify-between w-full relative z-10 pl-3 mt-0.5">
-                    <div className="flex items-center gap-1">
-                      {progress && (
-                        <span className="text-[8px] font-mono font-black text-stone-300">
-                          {progress.percentage === 100 ? '✓' : `${Math.round(progress.percentage)}%`}
-                        </span>
-                      )}
-                    </div>
-                    {isSelected && <div className="p-0.5 bg-primary rounded-full"><Check size={6} className="text-white" /></div>}
-                  </div>
+                  {isSelected && <div className="absolute top-1 right-1 p-0.5 bg-white/20 rounded-full z-20"><Check size={8} className="text-white" /></div>}
                 </div>
               );
             })}
@@ -193,79 +228,40 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     </div>
   );
 
-  const closeSidebar = () => {
-    setSidebar('none');
-    setActiveSlot(null);
-  };
-
-  const SidebarHeader = ({ type }: { type: 'schedule' | 'record' }) => {
-    const isSchedule = type === 'schedule';
-    return (
-      <div className="p-2.5 border-b border-stone-100 bg-white shrink-0 flex flex-col gap-2">
-        <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-                <div className={cn("p-1.5 rounded-lg", isSchedule ? "bg-indigo-50 text-indigo-500" : "bg-emerald-50 text-emerald-500")}>
-                    {isSchedule ? <Repeat size={12} /> : <Check size={12} />}
-                </div>
-                <div>
-                    <h3 className="text-[10px] font-black text-stone-800 tracking-tight leading-none">
-                        {activeSlot ? `${activeSlot.hour}:00` : ''} {isSchedule ? '安排' : '记录'}
-                    </h3>
-                    <p className="text-[7px] font-bold text-stone-400 uppercase tracking-widest mt-0.5">
-                        {isSchedule ? (isRepeatMode ? '循环模式 ON' : '单日安排') : '实际执行'}
-                    </p>
-                </div>
+  return (
+    <div className="flex h-full bg-white relative overflow-hidden">
+      {/* 任务选择侧边栏 (移动端) */}
+      <div className={cn(
+        "absolute inset-y-0 left-0 w-[280px] bg-white border-r border-stone-200 z-50 transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] flex flex-col shadow-2xl lg:shadow-none",
+        sidebar === 'task' ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <div className="p-5 border-b border-stone-100 flex justify-between items-center">
+            <div className="flex items-center gap-2.5">
+                <LayoutGrid size={16} className="text-stone-600" />
+                <h3 className="text-sm font-black text-stone-800 tracking-tight uppercase">任务选择</h3>
             </div>
-            <button onClick={closeSidebar} className="p-1 text-stone-300 hover:text-stone-500 transition-colors">
-                <X size={16} />
+            <button onClick={() => setSidebar('none')} className="p-2 text-stone-300 hover:text-stone-600 transition-colors">
+                <X size={20} />
             </button>
         </div>
-        
-        <div className="flex gap-1.5">
-            <button 
-                onClick={clearActiveSlot}
-                className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-stone-50 hover:bg-red-50 hover:text-red-500 rounded-lg text-[8px] font-bold text-stone-500 transition-all border border-stone-100 active:scale-95"
-            >
-                <Eraser size={10} /> 清空
-            </button>
-            {isSchedule && (
-                <button 
-                    onClick={() => setIsRepeatMode(!isRepeatMode)}
-                    className={cn(
-                        "flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[8px] font-bold transition-all border active:scale-95",
-                        isRepeatMode 
-                            ? "bg-indigo-500 border-indigo-500 text-white" 
-                            : "bg-white border-stone-100 text-stone-500 hover:border-indigo-100 hover:text-indigo-500"
-                    )}
-                >
-                    <Repeat size={10} /> 循环模式
+        <div className="px-5 py-3 bg-stone-50/50 border-b border-stone-100 flex justify-between items-center">
+            <span className="text-[11px] font-bold text-stone-800">{activeSlot?.hour}:00 {activeSlot?.type === 'schedule' ? '计划' : '记录'}</span>
+            {activeSlot?.type === 'schedule' && (
+                <button onClick={() => setIsRepeatMode(!isRepeatMode)} className={cn("text-[10px] font-black px-3 py-1.5 rounded-xl border", isRepeatMode ? "bg-primary text-white border-primary" : "bg-white text-stone-500 border-stone-200")}>
+                    <Repeat size={12} className="inline mr-1" /> 循环设定
                 </button>
             )}
         </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="flex h-full bg-white relative overflow-hidden">
-      <div className={cn(
-        "absolute left-0 top-0 bottom-0 w-[240px] sm:w-[280px] bg-stone-50 border-r border-stone-200 z-30 transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] flex flex-col",
-        sidebar === 'left' ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <SidebarHeader type="record" />
         <TaskPool />
-        <div className="p-3 bg-white border-t border-stone-100 shrink-0">
-            <button onClick={closeSidebar} className="w-full py-2 bg-stone-900 text-white rounded-xl text-[10px] font-bold active:scale-95 transition-transform">完成记录</button>
-        </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar relative z-10 h-full pb-40">
-        <div className="sticky top-0 bg-white z-20 px-4 py-3 flex justify-between items-center border-b border-stone-100">
-           <div className="flex-1 text-center text-[10px] font-black text-indigo-400 tracking-widest uppercase opacity-70">计划</div>
-           <div className="w-14 flex-shrink-0 text-center text-[8px] font-black text-stone-300 tracking-[0.2em] uppercase">Timeline</div>
-           <div className="flex-1 text-center text-[10px] font-black text-emerald-400 tracking-widest uppercase opacity-70">记录</div>
+      {/* 时间轴 */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar relative z-10 h-full pb-40 border-r border-stone-100">
+        <div className="sticky top-0 bg-white/95 backdrop-blur-md z-20 px-4 py-3.5 flex justify-between items-center border-b border-stone-100">
+           <div className="flex-1 text-center text-[11px] font-black text-indigo-500 tracking-widest uppercase opacity-70">计划</div>
+           <div className="w-14 flex-shrink-0 text-center text-[9px] font-black text-stone-300 tracking-[0.2em] uppercase">时间轴</div>
+           <div className="flex-1 text-center text-[11px] font-black text-emerald-500 tracking-widest uppercase opacity-70">记录</div>
         </div>
-        
         <div className="bg-white">
             {HOURS.map(hour => (
               <TimelineRow 
@@ -282,15 +278,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         </div>
       </div>
 
-      <div className={cn(
-        "absolute right-0 top-0 bottom-0 w-[240px] sm:w-[280px] bg-stone-50 border-l border-stone-200 z-30 transition-transform duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] flex flex-col",
-        sidebar === 'right' ? "translate-x-0" : "translate-x-full"
-      )}>
-        <SidebarHeader type="schedule" />
-        <TaskPool />
-        <div className="p-3 bg-white border-t border-stone-100 shrink-0">
-            <button onClick={closeSidebar} className="w-full py-2 bg-stone-900 text-white rounded-xl text-[10px] font-bold active:scale-95 transition-transform">确认安排</button>
-        </div>
+      {/* 侧边统计 (桌面端) */}
+      <div className="hidden lg:flex lg:w-[320px] border-l border-stone-100 flex-col bg-stone-50/30">
+        <StatsPanel />
       </div>
 
       <TaskEditorModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} task={editingTask} onSave={onUpdateTask} onDelete={onDeleteTask} />

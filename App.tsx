@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { BarChart2, Settings, ChevronLeft, ChevronRight, CalendarDays, Activity, Star } from 'lucide-react';
+import { BarChart2, Settings, ChevronLeft, ChevronRight, CalendarDays, Activity, Star, LayoutGrid, ClipboardCheck } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { AppState, Tab, Task, DayData, DayRating, RatingItem, Redemption, ShopItem } from './types';
@@ -140,7 +140,6 @@ export default function App() {
               if (Array.isArray(newState.recurringSchedule[h])) newState.recurringSchedule[h] = newState.recurringSchedule[h].filter(id => id !== taskId);
           });
           
-          // Optional: clean categoryOrder if no tasks left in that category
           const remainingCats = new Set(newState.tasks.map(t => t.category));
           newState.categoryOrder = newState.categoryOrder.filter(c => remainingCats.has(c));
           
@@ -221,7 +220,7 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen bg-stone-100 flex items-center justify-center overflow-hidden font-sans text-stone-800 p-0 sm:p-4">
-      <div className="w-full h-full sm:max-w-4xl sm:h-[94vh] sm:max-h-[1000px] bg-white sm:rounded-[2rem] flex flex-col relative border border-stone-200 shadow-2xl overflow-hidden">
+      <div className="w-full h-full sm:max-w-6xl sm:h-[94vh] sm:max-h-[1000px] bg-white sm:rounded-[2rem] flex flex-col relative border border-stone-200 shadow-2xl overflow-hidden">
         
         <header className="pt-8 sm:pt-10 pb-4 px-6 bg-white flex items-center justify-between z-40 select-none shrink-0 border-b border-stone-100">
            <div className="w-12 sm:w-24 flex justify-start">
@@ -260,30 +259,14 @@ export default function App() {
            </div>
            
            <div className="w-12 sm:w-24 flex justify-end">
-             {activeTab === 'tracker' && (
-               <button 
-                onClick={() => setActiveTab('stats')}
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-stone-50 text-stone-600 hover:bg-stone-100 transition-all active:scale-95 border border-stone-200"
-               >
-                 <BarChart2 size={20} />
-               </button>
-             )}
-             {activeTab === 'stats' && (
-               <button 
-                onClick={() => setActiveTab('tracker')}
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-stone-900 text-white shadow-lg transition-all active:scale-95"
-               >
-                 <Activity size={20} />
-               </button>
-             )}
              {activeTab === 'rating' && (
-               <button 
-                onClick={() => setIsRatingStatsOpen(true)}
-                className="w-10 h-10 flex items-center justify-center rounded-full bg-stone-50 text-stone-600 hover:bg-stone-100 transition-all active:scale-95 border border-stone-200"
-               >
-                 <BarChart2 size={20} />
-               </button>
-             )}
+                <button 
+                 onClick={() => setIsRatingStatsOpen(true)}
+                 className="w-10 h-10 flex items-center justify-center rounded-full bg-stone-50 text-stone-600 hover:bg-stone-100 transition-all active:scale-95 border border-stone-200"
+                >
+                  <BarChart2 size={20} />
+                </button>
+              )}
            </div>
         </header>
 
@@ -291,7 +274,7 @@ export default function App() {
           {activeTab === 'tracker' && (
             <TrackerView 
                 tasks={state.tasks} categoryOrder={state.categoryOrder} scheduleData={currentSchedule} recordData={currentRecord} 
-                recurringData={state.recurringSchedule} allRecords={state.records}
+                recurringData={state.recurringSchedule} allRecords={state.records} allSchedules={state.schedule}
                 onUpdateSchedule={updateScheduleHour} onUpdateRecord={updateRecordHour}
                 onUpdateRecurring={updateRecurringSchedule} onUpdateTask={handleUpdateTask}
                 onDeleteTask={handleDeleteTask} currentDate={currentDate}
@@ -331,8 +314,9 @@ export default function App() {
 
         <div className="h-24 bg-white border-t border-stone-100 flex items-start justify-center px-6 z-40 shrink-0">
             <nav className="w-full max-w-sm mt-3 bg-stone-100 rounded-2xl px-2 py-1.5 flex items-center justify-between border border-stone-200">
-                <NavButton label="追踪" active={activeTab === 'tracker' || activeTab === 'stats'} onClick={() => setActiveTab('tracker')} icon={<Activity size={20} />} />
-                <NavButton label="打分" active={activeTab === 'rating'} onClick={() => setActiveTab('rating')} icon={<Star size={20} />} />
+                <NavButton label="跟踪" active={activeTab === 'tracker'} onClick={() => setActiveTab('tracker')} icon={<ClipboardCheck size={20} />} />
+                <NavButton label="统计" active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} icon={<BarChart2 size={20} />} />
+                <NavButton label="复盘" active={activeTab === 'rating'} onClick={() => setActiveTab('rating')} icon={<Star size={20} />} />
                 <NavButton label="设置" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={20} />} />
             </nav>
         </div>

@@ -125,7 +125,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     <div className="h-full bg-white overflow-y-auto custom-scrollbar relative">
       <div className="relative z-10 px-5 pt-6 pb-2 flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-bold text-stone-800 tracking-tight">配置</h2>
+          <h2 className="text-xl font-bold text-stone-800 tracking-tight">任务与目标</h2>
         </div>
         <div className="flex gap-2">
             <button 
@@ -290,9 +290,6 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                       </div>
                       <ChevronRight size={14} className="text-stone-300 group-hover:text-stone-500 transition-colors" />
                 </button>
-            </div>
-            <div className="text-center mt-4">
-                <span className="text-[9px] text-stone-300 font-medium tracking-wide">ChronosFlow v1.0.3</span>
             </div>
         </div>
       </div>

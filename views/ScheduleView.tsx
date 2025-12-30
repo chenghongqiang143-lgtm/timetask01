@@ -98,7 +98,16 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
         </div>
         <div className="pt-1">
           {HOURS.map(hour => (
-            <TimelineRow key={hour} hour={hour} assignedTaskIds={dayData.hours[hour] || []} allTasks={tasks} onClick={handleHourClick} showDuration={true} />
+            // Fix: Updated TimelineRow props to match the component's expected interface
+            <TimelineRow 
+              key={hour} 
+              hour={hour} 
+              assignedScheduleIds={dayData.hours[hour] || []} 
+              assignedRecordIds={recordData.hours[hour] || []}
+              allTasks={tasks} 
+              onScheduleClick={handleHourClick} 
+              onRecordClick={() => {}}
+            />
           ))}
         </div>
       </div>

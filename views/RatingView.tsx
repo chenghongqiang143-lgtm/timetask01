@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { DayRating, RatingItem, ShopItem, Redemption } from '../types';
 import { cn, formatDate, generateId } from '../utils';
-import { MessageSquareQuote, Plus, Settings2, X, Trash2, Info, BarChart2, ShoppingBag, Coins, Edit2, Save, AlertCircle } from 'lucide-react';
+import { MessageSquareQuote, Plus, Settings2, X, Trash2, Info, BarChart2, ShoppingBag, Coins, Edit2, Save, AlertCircle, TrendingUp } from 'lucide-react';
 import { startOfWeek, addDays, format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 
@@ -139,33 +139,36 @@ export const RatingView: React.FC<RatingViewProps> = ({
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/60 p-2 sm:p-4 backdrop-blur-sm">
             <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] w-full max-w-lg flex flex-col border border-stone-300 shadow-2xl overflow-hidden max-h-[85vh]">
                 <div className="px-4 py-4 sm:px-6 sm:py-5 bg-stone-50 border-b border-stone-200 flex justify-between items-center shrink-0">
-                    <div>
-                        <h3 className="font-black text-stone-800 text-xs sm:text-sm">周得分趋势</h3>
-                        <p className="text-[8px] sm:text-[9px] text-stone-400 font-bold uppercase tracking-wider">
-                            {format(weekStart, 'M月d日')} - {format(weekDates[6], 'M月d日')}
-                        </p>
+                    <div className="flex items-center gap-2.5">
+                        <TrendingUp size={18} className="text-primary" />
+                        <div>
+                            <h3 className="font-black text-stone-800 text-xs sm:text-sm">评估趋势</h3>
+                            <p className="text-[8px] sm:text-[9px] text-stone-400 font-bold uppercase tracking-wider">
+                                {format(weekStart, 'M月d日')} - {format(weekDates[6], 'M月d日')}
+                            </p>
+                        </div>
                     </div>
                     <button onClick={() => onToggleStats(false)} className="p-1.5 hover:bg-stone-200 rounded-full transition-colors text-stone-400">
                         <X size={18} />
                     </button>
                 </div>
                 
-                <div className="p-2 sm:p-4 overflow-x-auto custom-scrollbar flex-1 bg-white">
+                <div className="p-4 sm:p-6 overflow-x-auto custom-scrollbar flex-1 bg-white">
                     <div className="min-w-full">
                         {/* Header: Weekdays */}
-                        <div className="flex mb-3 sm:mb-4">
-                            <div className="w-14 sm:w-20 shrink-0"></div>
+                        <div className="flex mb-4">
+                            <div className="w-16 sm:w-24 shrink-0"></div>
                             {weekDates.map(d => {
                                 const isToday = formatDate(d) === formatDate(new Date());
                                 return (
-                                    <div key={d.toString()} className="flex-1 flex flex-col items-center justify-center gap-0.5">
+                                    <div key={d.toString()} className="flex-1 flex flex-col items-center justify-center gap-1">
                                         <span className={cn(
-                                            "text-[7px] sm:text-[8px] font-bold leading-none px-1 py-0.5 rounded-full",
-                                            isToday ? "bg-stone-800 text-white" : "text-stone-300"
+                                            "text-[8px] sm:text-[9px] font-bold leading-none px-1.5 py-0.5 rounded-full",
+                                            isToday ? "bg-stone-900 text-white" : "text-stone-300"
                                         )}>{format(d, 'd')}</span>
                                         <span className={cn(
-                                            "text-[8px] sm:text-[9px] font-black",
-                                            isToday ? "text-stone-800" : "text-stone-500"
+                                            "text-[9px] sm:text-[10px] font-black",
+                                            isToday ? "text-stone-900" : "text-stone-500"
                                         )}>{format(d, 'EE', { locale: zhCN }).replace('周', '')}</span>
                                     </div>
                                 );
@@ -173,11 +176,11 @@ export const RatingView: React.FC<RatingViewProps> = ({
                         </div>
                         
                         {/* Body: Grid */}
-                        <div className="space-y-1.5 sm:space-y-2">
+                        <div className="space-y-2">
                             {ratingItems.map(item => (
                                 <div key={item.id} className="flex items-center group">
-                                    <div className="w-14 sm:w-20 shrink-0 pr-1 sm:pr-2">
-                                        <div className="text-[9px] sm:text-[11px] font-bold text-stone-500 truncate leading-tight group-hover:text-stone-900 transition-colors" title={item.name}>
+                                    <div className="w-16 sm:w-24 shrink-0 pr-2">
+                                        <div className="text-[10px] sm:text-[12px] font-bold text-stone-500 truncate leading-tight group-hover:text-stone-900 transition-colors" title={item.name}>
                                             {item.name}
                                         </div>
                                     </div>
@@ -185,9 +188,9 @@ export const RatingView: React.FC<RatingViewProps> = ({
                                         const k = formatDate(d);
                                         const score = ratings[k]?.scores?.[item.id];
                                         return (
-                                            <div key={k} className="flex-1 h-7 sm:h-9 flex items-center justify-center p-0.5">
+                                            <div key={k} className="flex-1 h-8 sm:h-10 flex items-center justify-center p-0.5">
                                                 <div className={cn(
-                                                    "w-full h-full rounded sm:rounded-lg shadow-sm transition-all flex items-center justify-center text-[8px] sm:text-[10px] font-black",
+                                                    "w-full h-full rounded sm:rounded-lg shadow-sm transition-all flex items-center justify-center text-[9px] sm:text-[11px] font-black",
                                                     getCellColor(score)
                                                 )}>
                                                     {score !== undefined && (score > 0 ? `+${score}` : score)}
@@ -200,20 +203,14 @@ export const RatingView: React.FC<RatingViewProps> = ({
                         </div>
 
                         {/* Legend */}
-                        <div className="mt-6 sm:mt-8 pt-3 sm:pt-4 border-t border-stone-100 flex items-center justify-center gap-3 sm:gap-4 text-[8px] sm:text-[9px] font-black text-stone-400 uppercase tracking-widest">
-                            <div className="flex items-center gap-1"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded bg-rose-500"></div> -2</div>
-                            <div className="flex items-center gap-1"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded bg-rose-300"></div> -1</div>
-                            <div className="flex items-center gap-1"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded bg-stone-300"></div> 0</div>
-                            <div className="flex items-center gap-1"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded bg-emerald-300"></div> +1</div>
-                            <div className="flex items-center gap-1"><div className="w-2 h-2 sm:w-3 sm:h-3 rounded bg-emerald-500"></div> +2</div>
+                        <div className="mt-8 pt-6 border-t border-stone-100 flex items-center justify-center gap-4 text-[9px] sm:text-[10px] font-black text-stone-400 uppercase tracking-widest">
+                            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-rose-500"></div> -2</div>
+                            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-rose-300"></div> -1</div>
+                            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-stone-300"></div> 0</div>
+                            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-emerald-300"></div> +1</div>
+                            <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded bg-emerald-500"></div> +2</div>
                         </div>
                     </div>
-                </div>
-                
-                <div className="px-4 py-3 sm:px-6 sm:py-4 bg-stone-50 border-t border-stone-100 text-center shrink-0">
-                    <p className="text-[9px] sm:text-[10px] font-bold text-stone-400">
-                        查看本周自然周内的自律评估分布状况
-                    </p>
                 </div>
             </div>
         </div>
@@ -315,7 +312,7 @@ export const RatingView: React.FC<RatingViewProps> = ({
            
            <div className="flex items-center justify-between w-full relative z-10">
                 <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em]">当前结余</span>
+                    <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em]">当前总积分</span>
                     <div className="flex items-center gap-1.5">
                         <span className="text-4xl font-black tabular-nums tracking-tighter text-emerald-400">{balance}</span>
                         <Coins size={16} className="text-emerald-400" />
@@ -336,7 +333,7 @@ export const RatingView: React.FC<RatingViewProps> = ({
            
            <div className="flex items-center justify-between w-full relative z-10 px-1">
                 <div className="flex flex-col">
-                    <span className="text-[8px] font-bold text-white/30 uppercase tracking-widest">今日盈亏</span>
+                    <span className="text-[8px] font-bold text-white/30 uppercase tracking-widest">今日积分</span>
                     <span className={cn("text-xs font-black", todayScore >= 0 ? "text-emerald-400" : "text-rose-400")}>
                         {todayScore > 0 ? `+${todayScore}` : todayScore}
                     </span>
