@@ -1,4 +1,5 @@
-import { AppState, Task } from '../types';
+
+import { AppState, Task, RatingItem, ShopItem } from '../types';
 
 const STORAGE_KEY = 'chronos_flow_data_v1';
 
@@ -10,32 +11,86 @@ export const DEFAULT_TASKS: Task[] = [
   { id: 't5', name: '用餐', color: '#f59e0b', category: '生活' },
 ];
 
+export const DEFAULT_RATING_ITEMS: RatingItem[] = [
+  {
+    id: 'r1',
+    name: '身心状态',
+    reasons: {
+      [-2]: '极度疲惫',
+      [-1]: '有些焦虑',
+      [0]: '平平淡淡',
+      [1]: '比较充实',
+      [2]: '精力充沛'
+    }
+  },
+  {
+    id: 'r2',
+    name: '专注程度',
+    reasons: {
+      [-2]: '完全摸鱼',
+      [-1]: '经常分心',
+      [0]: '正常处理',
+      [1]: '深度投入',
+      [2]: '进入心流'
+    }
+  }
+];
+
+export const DEFAULT_SHOP_ITEMS: ShopItem[] = [
+  { id: 's1', name: '一杯奶茶', cost: 10, icon: '🧋' },
+  { id: 's2', name: '游戏 1小时', cost: 15, icon: '🎮' },
+  { id: 's3', name: '作弊餐', cost: 30, icon: '🍔' },
+  { id: 's4', name: '看电影', cost: 50, icon: '🎬' },
+  { id: 's5', name: '懒惰一天', cost: 100, icon: '🛌' },
+];
+
 export const loadState = (): AppState => {
   try {
     const serialized = localStorage.getItem(STORAGE_KEY);
     if (!serialized) {
       return {
         tasks: DEFAULT_TASKS,
+        ratingItems: DEFAULT_RATING_ITEMS,
+        shopItems: DEFAULT_SHOP_ITEMS,
+        redemptions: [],
         schedule: {},
         recurringSchedule: {},
         records: {},
-        reviews: {}
+        ratings: {},
       };
     }
     const parsed = JSON.parse(serialized);
-    // Ensure recurringSchedule exists for older data migrations
-    if (!parsed.recurringSchedule) {
-        parsed.recurringSchedule = {};
-    }
+    // Data migrations
+    if (!parsed.recurringSchedule) parsed.recurringSchedule = {};
+    if (!parsed.ratingItems) parsed.ratingItems = DEFAULT_RATING_ITEMS;
+    if (!parsed.ratings) parsed.ratings = {};
+    if (!parsed.shopItems) parsed.shopItems = DEFAULT_SHOP_ITEMS;
+    if (!parsed.redemptions) parsed.redemptions = [];
+    
+    // Ensure all ratings have the new structure
+    Object.keys(parsed.ratings).forEach(date => {
+        if (typeof parsed.ratings[date].score === 'number') {
+            const oldScore = parsed.ratings[date].score;
+            parsed.ratings[date] = {
+                scores: { 'r1': oldScore - 3 }, // Map 1-5 to -2 to 2
+                comment: parsed.ratings[date].comment || ''
+            };
+        }
+        if (!parsed.ratings[date].scores) parsed.ratings[date].scores = {};
+    });
+
     return parsed;
   } catch (e) {
     console.error("Failed to load state", e);
     return {
       tasks: DEFAULT_TASKS,
+      ratingItems: DEFAULT_RATING_ITEMS,
+      shopItems: DEFAULT_SHOP_ITEMS,
+      redemptions: [],
       schedule: {},
       recurringSchedule: {},
       records: {},
-      reviews: {}
+      ratings: {},
     };
   }
 };

@@ -20,14 +20,43 @@ export interface DayData {
   hours: Record<number, string[]>;
 }
 
-export type Tab = 'tracker' | 'stats' | 'settings';
+export interface RatingItem {
+  id: string;
+  name: string;
+  reasons: Record<number, string>; // Map of score (-2 to 2) to label
+}
+
+export interface DayRating {
+  scores: Record<string, number>; // ratingItemId -> selected score
+  comment: string;
+}
+
+export interface ShopItem {
+  id: string;
+  name: string;
+  cost: number;
+  icon: string;
+}
+
+export interface Redemption {
+  id: string;
+  shopItemId: string;
+  itemName: string;
+  cost: number;
+  date: string; // ISO string
+}
+
+export type Tab = 'tracker' | 'stats' | 'rating' | 'settings';
 
 export interface AppState {
   tasks: Task[];
+  ratingItems: RatingItem[];
+  shopItems: ShopItem[];
+  redemptions: Redemption[];
   schedule: Record<string, DayData>; // Key is YYYY-MM-DD
   recurringSchedule: Record<number, string[]>; // Key is hour (0-23), Value is task IDs that repeat daily
   records: Record<string, DayData>; // Key is YYYY-MM-DD
-  reviews: Record<string, string>; // Key is YYYY-MM-DD, Value is text
+  ratings: Record<string, DayRating>; // Key is YYYY-MM-DD
 }
 
 export interface DragItem {

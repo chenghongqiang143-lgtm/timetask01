@@ -12,9 +12,6 @@ interface StatsViewProps {
   allSchedules: Record<string, DayData>;
   recurringSchedule: Record<number, string[]>;
   allRecords: Record<string, DayData>;
-  review: string;
-  onUpdateReview: (text: string) => void;
-  currentDate: string;
   dateObj: Date;
 }
 
@@ -96,7 +93,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                                         {stat.actualTotal.toFixed(1)} <span className="text-stone-300 mx-0.5">/</span> {stat.plannedTotal.toFixed(1)}h
                                     </div>
                                 </div>
-                                <div className="h-2.5 bg-stone-50 rounded-full overflow-hidden border border-stone-100 shadow-inner">
+                                <div className="h-4 bg-stone-50 rounded-full overflow-hidden border border-stone-100 shadow-inner">
                                     <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(stat.execRatio, 100)}%`, backgroundColor: stat.color }} />
                                 </div>
                             </div>
@@ -126,7 +123,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                                         {stat.actualTotal.toFixed(1)} <span className="text-stone-300 mx-0.5">/</span> {stat.plannedTotal.toFixed(1)}h
                                     </div>
                                 </div>
-                                <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden border border-stone-100 shadow-inner">
+                                <div className="h-4 bg-stone-100 rounded-full overflow-hidden border border-stone-100 shadow-inner">
                                     <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(stat.execRatio, 100)}%`, backgroundColor: stat.color }} />
                                 </div>
                             </div>

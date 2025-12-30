@@ -1,30 +1,33 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Calendar, BarChart2, Settings, ChevronLeft, ChevronRight, ClipboardList, CalendarDays, Activity } from 'lucide-react';
+import { BarChart2, Settings, ChevronLeft, ChevronRight, CalendarDays, Activity, Star } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import { AppState, Tab, Task, DayData } from './types';
-import { loadState, saveState, DEFAULT_TASKS } from './services/storage';
+import { AppState, Tab, Task, DayData, DayRating, RatingItem, Redemption, ShopItem } from './types';
+import { loadState, saveState, DEFAULT_TASKS, DEFAULT_RATING_ITEMS } from './services/storage';
 import { cn, generateId, formatDate } from './utils';
 
 import { TrackerView } from './views/TrackerView';
 import { StatsView } from './views/StatsView';
 import { SettingsTab } from './views/SettingsTab';
-import { ReviewModal } from './components/ReviewModal';
+import { RatingView } from './views/RatingView';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('tracker');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [installPrompt, setInstallPrompt] = useState<any>(null);
-  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isRatingStatsOpen, setIsRatingStatsOpen] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
   
   const [state, setState] = useState<AppState>({
       tasks: [],
+      ratingItems: [],
+      shopItems: [],
+      redemptions: [],
       schedule: {},
       recurringSchedule: {},
       records: {},
-      reviews: {}
+      ratings: {},
   });
 
   useEffect(() => {
@@ -52,7 +55,6 @@ export default function App() {
   }, [state.schedule, state.recurringSchedule, dateKey]);
 
   const currentRecord: DayData = state.records[dateKey] || { hours: {} };
-  const currentReview: string = state.reviews[dateKey] || '';
 
   const updateScheduleHour = (hour: number, taskIds: string[]) => {
     setState(prev => ({ ...prev, schedule: { ...prev.schedule, [dateKey]: { hours: { ...prev.schedule[dateKey]?.hours, [hour]: taskIds } } } }));
@@ -66,8 +68,27 @@ export default function App() {
     setState(prev => ({ ...prev, records: { ...prev.records, [dateKey]: { hours: { ...currentRecord.hours, [hour]: taskIds } } } }));
   };
 
-  const updateReview = (text: string) => {
-    setState(prev => ({ ...prev, reviews: { ...prev.reviews, [dateKey]: text } }));
+  const handleUpdateRating = (key: string, rating: DayRating) => {
+    setState(prev => ({ ...prev, ratings: { ...prev.ratings, [key]: rating } }));
+  };
+
+  const handleUpdateRatingItems = (items: RatingItem[]) => {
+    setState(prev => ({ ...prev, ratingItems: items }));
+  };
+  
+  const handleUpdateShopItems = (items: ShopItem[]) => {
+    setState(prev => ({ ...prev, shopItems: items }));
+  };
+
+  const handleRedeem = (item: ShopItem) => {
+    const redemption: Redemption = {
+        id: generateId(),
+        shopItemId: item.id,
+        itemName: item.name,
+        cost: item.cost,
+        date: new Date().toISOString()
+    };
+    setState(prev => ({ ...prev, redemptions: [redemption, ...prev.redemptions] }));
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
@@ -84,23 +105,20 @@ export default function App() {
       setState(prev => {
           const newState = JSON.parse(JSON.stringify(prev)) as AppState;
           newState.tasks = newState.tasks.filter(t => t.id !== taskId);
-          Object.keys(newState.schedule).forEach(dayKey => {
-              const dayData = newState.schedule[dayKey];
-              if (dayData && dayData.hours) Object.keys(dayData.hours).forEach(hKey => {
-                  const h = parseInt(hKey);
-                  if (Array.isArray(dayData.hours[h])) dayData.hours[h] = dayData.hours[h].filter(id => id !== taskId);
+          const cleanup = (obj: Record<string, DayData>) => {
+              Object.keys(obj).forEach(dayKey => {
+                  const dayData = obj[dayKey];
+                  if (dayData && dayData.hours) Object.keys(dayData.hours).forEach(hKey => {
+                      const h = parseInt(hKey);
+                      if (Array.isArray(dayData.hours[h])) dayData.hours[h] = dayData.hours[h].filter(id => id !== taskId);
+                  });
               });
-          });
+          };
+          cleanup(newState.schedule);
+          cleanup(newState.records);
           if (newState.recurringSchedule) Object.keys(newState.recurringSchedule).forEach(hKey => {
               const h = parseInt(hKey);
               if (Array.isArray(newState.recurringSchedule[h])) newState.recurringSchedule[h] = newState.recurringSchedule[h].filter(id => id !== taskId);
-          });
-          Object.keys(newState.records).forEach(dayKey => {
-              const dayData = newState.records[dayKey];
-              if (dayData && dayData.hours) Object.keys(dayData.hours).forEach(hKey => {
-                  const h = parseInt(hKey);
-                  if (Array.isArray(dayData.hours[h])) dayData.hours[h] = dayData.hours[h].filter(id => id !== taskId);
-              });
           });
           return newState;
       });
@@ -110,9 +128,7 @@ export default function App() {
     if (installPrompt) {
       installPrompt.prompt();
       const { outcome } = await installPrompt.userChoice;
-      if (outcome === 'accepted') {
-        setInstallPrompt(null);
-      }
+      if (outcome === 'accepted') setInstallPrompt(null);
     }
   };
 
@@ -135,11 +151,8 @@ export default function App() {
         if (json && json.tasks && Array.isArray(json.tasks)) {
            setState(json);
            alert("数据导入成功");
-        } else {
-           alert("无效的数据文件");
-        }
+        } else alert("无效的数据文件");
       } catch (err) {
-        console.error(err);
         alert("解析文件失败");
       }
     };
@@ -149,10 +162,13 @@ export default function App() {
   const handleClearData = () => {
     setState({
       tasks: DEFAULT_TASKS,
+      ratingItems: DEFAULT_RATING_ITEMS,
+      shopItems: [],
+      redemptions: [],
       schedule: {},
       recurringSchedule: {},
       records: {},
-      reviews: {}
+      ratings: {},
     });
   };
 
@@ -166,11 +182,8 @@ export default function App() {
   const triggerDatePicker = () => {
     if (dateInputRef.current) {
         try {
-            if ('showPicker' in HTMLInputElement.prototype) {
-                (dateInputRef.current as any).showPicker();
-            } else {
-                dateInputRef.current.click();
-            }
+            if ('showPicker' in HTMLInputElement.prototype) (dateInputRef.current as any).showPicker();
+            else dateInputRef.current.click();
         } catch (e) {
             dateInputRef.current.click();
         }
@@ -179,9 +192,9 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen bg-stone-100 flex items-center justify-center overflow-hidden font-sans text-stone-800 p-0 sm:p-4">
-      <div className="w-full h-full sm:max-w-4xl sm:h-[94vh] sm:max-h-[1000px] bg-white sm:rounded-[2rem] flex flex-col relative border border-stone-200">
+      <div className="w-full h-full sm:max-w-4xl sm:h-[94vh] sm:max-h-[1000px] bg-white sm:rounded-[2rem] flex flex-col relative border border-stone-200 shadow-2xl overflow-hidden">
         
-        <header className="pt-8 sm:pt-10 pb-4 px-6 bg-white flex items-center justify-between z-40 select-none sm:rounded-t-[2rem] shrink-0 border-b border-stone-100">
+        <header className="pt-8 sm:pt-10 pb-4 px-6 bg-white flex items-center justify-between z-40 select-none shrink-0 border-b border-stone-100">
            <div className="w-12 sm:w-24 flex justify-start">
                <div className="relative w-10 h-10 flex items-center justify-center">
                    <button 
@@ -204,7 +217,6 @@ export default function App() {
                 <button onClick={() => setCurrentDate(subDays(currentDate, 1))} className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-50 rounded-full transition-all active:scale-75">
                     <ChevronLeft size={24} />
                 </button>
-
                 <div className="flex flex-col items-center justify-center text-center">
                     <span className="font-bold text-lg sm:text-2xl text-stone-800 tracking-tight leading-none">
                         {format(currentDate, 'M月d日', { locale: zhCN })}
@@ -213,58 +225,80 @@ export default function App() {
                         {format(currentDate, 'EEEE', { locale: zhCN })}
                     </span>
                 </div>
-
                 <button onClick={() => setCurrentDate(addDays(currentDate, 1))} className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-50 rounded-full transition-all active:scale-75">
                     <ChevronRight size={24} />
                 </button>
            </div>
-
+           
            <div className="w-12 sm:w-24 flex justify-end">
-             <button onClick={() => setIsReviewModalOpen(true)} className="w-10 h-10 flex items-center justify-center rounded-full bg-stone-50 text-stone-600 transition-all active:scale-95 hover:bg-stone-100 border border-stone-200">
-               <ClipboardList size={20} />
-             </button>
+             {activeTab === 'tracker' && (
+               <button 
+                onClick={() => setActiveTab('stats')}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-stone-50 text-stone-600 hover:bg-stone-100 transition-all active:scale-95 border border-stone-200"
+               >
+                 <BarChart2 size={20} />
+               </button>
+             )}
+             {activeTab === 'stats' && (
+               <button 
+                onClick={() => setActiveTab('tracker')}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-stone-900 text-white shadow-lg transition-all active:scale-95"
+               >
+                 <Activity size={20} />
+               </button>
+             )}
+             {activeTab === 'rating' && (
+               <button 
+                onClick={() => setIsRatingStatsOpen(true)}
+                className="w-10 h-10 flex items-center justify-center rounded-full bg-stone-50 text-stone-600 hover:bg-stone-100 transition-all active:scale-95 border border-stone-200"
+               >
+                 <BarChart2 size={20} />
+               </button>
+             )}
            </div>
         </header>
 
         <main className="flex-1 overflow-hidden relative bg-white z-10">
           {activeTab === 'tracker' && (
             <TrackerView 
-                tasks={state.tasks} 
-                scheduleData={currentSchedule} 
-                recordData={currentRecord} 
-                recurringData={state.recurringSchedule}
-                allRecords={state.records}
-                onUpdateSchedule={updateScheduleHour}
-                onUpdateRecord={updateRecordHour}
-                onUpdateRecurring={updateRecurringSchedule}
-                onUpdateTask={handleUpdateTask}
-                onDeleteTask={handleDeleteTask}
-                currentDate={currentDate}
+                tasks={state.tasks} scheduleData={currentSchedule} recordData={currentRecord} 
+                recurringData={state.recurringSchedule} allRecords={state.records}
+                onUpdateSchedule={updateScheduleHour} onUpdateRecord={updateRecordHour}
+                onUpdateRecurring={updateRecurringSchedule} onUpdateTask={handleUpdateTask}
+                onDeleteTask={handleDeleteTask} currentDate={currentDate}
             />
           )}
           {activeTab === 'stats' && (
-            <StatsView tasks={state.tasks} scheduleData={currentSchedule} recordData={currentRecord} allSchedules={state.schedule} recurringSchedule={state.recurringSchedule} allRecords={state.records} review={currentReview} onUpdateReview={updateReview} currentDate={dateKey} dateObj={currentDate} />
+            <StatsView tasks={state.tasks} scheduleData={currentSchedule} recordData={currentRecord} allSchedules={state.schedule} recurringSchedule={state.recurringSchedule} allRecords={state.records} dateObj={currentDate} />
+          )}
+          {activeTab === 'rating' && (
+            <RatingView 
+                currentDate={currentDate} ratings={state.ratings} ratingItems={state.ratingItems}
+                shopItems={state.shopItems} redemptions={state.redemptions}
+                onUpdateRating={handleUpdateRating} onUpdateRatingItems={handleUpdateRatingItems}
+                onUpdateShopItems={handleUpdateShopItems} onRedeem={handleRedeem}
+                isStatsOpen={isRatingStatsOpen} onToggleStats={setIsRatingStatsOpen}
+            />
           )}
           {activeTab === 'settings' && (
             <SettingsTab tasks={state.tasks} onAddTask={handleAddTask} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} showInstallButton={!!installPrompt} onInstall={handleInstallApp} onExportData={handleExportData} onImportData={handleImportData} onClearData={handleClearData} allSchedules={state.schedule} allRecords={state.records} currentDate={currentDate} />
           )}
         </main>
 
-        <div className="h-24 bg-white border-t border-stone-100 flex items-start justify-center px-6 z-40 shrink-0 sm:rounded-b-[2rem]">
-            <nav className="w-full max-w-md mt-3 bg-stone-100 rounded-2xl px-2 py-1.5 flex items-center justify-between border border-stone-200">
-                <NavButton label="追踪" active={activeTab === 'tracker'} onClick={() => setActiveTab('tracker')} icon={<Activity size={20} />} />
-                <NavButton label="统计" active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} icon={<BarChart2 size={20} />} />
+        <div className="h-24 bg-white border-t border-stone-100 flex items-start justify-center px-6 z-40 shrink-0">
+            <nav className="w-full max-w-sm mt-3 bg-stone-100 rounded-2xl px-2 py-1.5 flex items-center justify-between border border-stone-200">
+                <NavButton label="追踪" active={activeTab === 'tracker' || activeTab === 'stats'} onClick={() => setActiveTab('tracker')} icon={<Activity size={20} />} />
+                <NavButton label="打分" active={activeTab === 'rating'} onClick={() => setActiveTab('rating')} icon={<Star size={20} />} />
                 <NavButton label="设置" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={20} />} />
             </nav>
         </div>
-        <ReviewModal isOpen={isReviewModalOpen} onClose={() => setIsReviewModalOpen(false)} date={currentDate} initialContent={currentReview} onSave={updateReview} />
       </div>
     </div>
   );
 }
 
 const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) => (
-  <button onClick={onClick} className={cn("flex flex-col items-center justify-center flex-1 py-1 px-2 rounded-xl transition-all duration-300 gap-1", active ? "text-primary bg-white border border-stone-200" : "text-stone-400 hover:text-stone-600")}>
+  <button onClick={onClick} className={cn("flex flex-col items-center justify-center flex-1 py-1 px-2 rounded-xl transition-all duration-300 gap-1", active ? "text-primary bg-white border border-stone-200 shadow-sm" : "text-stone-400 hover:text-stone-600")}>
     <div className={cn("transition-transform duration-300", active ? "scale-110" : "scale-100")}>{icon}</div>
     <span className={cn("text-[9px] font-bold tracking-tight uppercase", active ? "opacity-100" : "opacity-60")}>{label}</span>
   </button>
