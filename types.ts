@@ -20,7 +20,7 @@ export interface DayData {
   hours: Record<number, string[]>;
 }
 
-export type Tab = 'schedule' | 'record' | 'stats' | 'settings';
+export type Tab = 'tracker' | 'stats' | 'settings';
 
 export interface AppState {
   tasks: Task[];
