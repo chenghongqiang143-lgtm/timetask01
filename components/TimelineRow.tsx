@@ -34,15 +34,22 @@ export const TimelineRow: React.FC<TimelineRowProps> = ({
     if (tasks.length === 0) return null;
     return (
       <div className="flex gap-0.5 w-full h-full overflow-hidden">
-        {tasks.map((task, idx) => (
-          <div
-            key={`${task.id}-${idx}`}
-            className="flex-1 h-full rounded-md flex items-center justify-center text-[10px] font-black truncate px-1 leading-none transition-all animate-in fade-in slide-in-from-bottom-1 duration-500 border border-black/5"
-            style={{ backgroundColor: task.color, color: getContrastColor(task.color) }}
-          >
-            {tasks.length <= 3 ? task.name : ''}
-          </div>
-        ))}
+        {tasks.map((task, idx) => {
+          const textColor = getContrastColor(task.color);
+          return (
+            <div
+              key={`${task.id}-${idx}`}
+              className="flex-1 h-full rounded-md flex items-center justify-center text-[10px] font-bold tracking-tight truncate px-1.5 leading-none transition-all animate-in fade-in slide-in-from-bottom-1 duration-500 border border-black/5"
+              style={{ 
+                backgroundColor: task.color, 
+                color: textColor,
+                textShadow: textColor === '#ffffff' ? '0 1px 1px rgba(0,0,0,0.2)' : 'none'
+              }}
+            >
+              {tasks.length <= 4 ? task.name : ''}
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -68,7 +75,7 @@ export const TimelineRow: React.FC<TimelineRowProps> = ({
         "w-14 flex-shrink-0 flex items-center justify-center text-[10px] font-mono transition-all duration-300 select-none z-10 border-x border-stone-50",
         (isScheduleActive || isRecordActive) 
             ? "bg-stone-900 text-white font-bold scale-110 rounded-sm" 
-            : "text-stone-300 group-hover:text-stone-500 group-hover:bg-stone-50 bg-white"
+            : "text-stone-300 group-hover:text-stone-600 group-hover:bg-stone-50 bg-white"
       )}>
         {formatHour(hour)}
       </div>

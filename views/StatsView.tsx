@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { Task, DayData, HOURS } from '../types';
-import { CalendarRange, Clock, TrendingUp } from 'lucide-react';
+import { CalendarRange, Clock, TrendingUp, Target, CheckCircle2 } from 'lucide-react';
 import { startOfWeek, endOfWeek, eachDayOfInterval, format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { formatDate, cn } from '../utils';
@@ -54,6 +54,40 @@ export const StatsView: React.FC<StatsViewProps> = ({
     }).filter(t => t.actual > 0 || t.planned > 0).sort((a, b) => b.actual - a.actual);
   }, [dateObj, allRecords, allSchedules, recurringSchedule, tasks]);
 
+  const dailyGoalStats = useMemo(() => {
+    const dKey = formatDate(dateObj);
+    const recHours = allRecords[dKey]?.hours || {};
+    
+    return tasks.filter(t => t.targets && t.targets.value > 0).map(t => {
+      let actual = 0;
+      const target = t.targets!;
+      const mode = target.mode || 'duration';
+
+      HOURS.forEach(h => {
+        const actualRec = recHours[h] || [];
+        if (actualRec.includes(t.id)) {
+            actual += (mode === 'count' ? 1 : (1 / (actualRec.length || 1)));
+        }
+      });
+
+      // For daily targets (frequency = 1), we show progress for today.
+      // For multi-day targets, we still show how today's effort contributes or just today's portion.
+      // Usually, users want to see "Today's portion of the goal".
+      const dailyTargetValue = target.frequency > 0 ? (target.value / target.frequency) : target.value;
+      const progressPercent = Math.min((actual / dailyTargetValue) * 100, 100);
+      
+      return { 
+        ...t, 
+        actual, 
+        targetValue: dailyTargetValue, 
+        progressPercent, 
+        mode,
+        isCompleted: progressPercent >= 100,
+        frequency: target.frequency
+      };
+    }).sort((a, b) => (a.isCompleted === b.isCompleted ? b.progressPercent - a.progressPercent : a.isCompleted ? 1 : -1));
+  }, [dateObj, allRecords, tasks]);
+
   const weeklyMatrixStats = useMemo(() => {
     return tasks.map(t => {
       const dailyData = weekRange.map(day => {
@@ -76,10 +110,67 @@ export const StatsView: React.FC<StatsViewProps> = ({
   }, [weekRange, allRecords, tasks]);
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-y-auto custom-scrollbar pb-32">
-        <div className="p-4 space-y-6">
+    <div className="flex flex-col h-full bg-stone-50 overflow-y-auto custom-scrollbar pb-32">
+        <div className="p-4 space-y-4">
             
-            {/* Today's Summary */}
+            {/* 每日目标达成情况 (New Section) */}
+            <div className="bg-white rounded-[2rem] border border-stone-200 p-6 shadow-sm">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-2">
+                        <Target size={14} className="text-primary" />
+                        每日目标达成
+                    </h3>
+                    <div className="text-[10px] font-bold text-stone-400">今日进度</div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {dailyGoalStats.map(stat => (
+                        <div key={stat.id} className="bg-stone-50/50 border border-stone-100 p-3 rounded-2xl flex flex-col gap-2 relative overflow-hidden group">
+                            {stat.isCompleted && (
+                                <div className="absolute -right-2 -top-2 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <CheckCircle2 size={48} className="text-emerald-500" />
+                                </div>
+                            )}
+                            <div className="flex justify-between items-center relative z-10">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: stat.color }} />
+                                    <span className="text-[11px] font-bold text-stone-700">{stat.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    {stat.isCompleted && <CheckCircle2 size={10} className="text-emerald-500" />}
+                                    <span className={cn(
+                                        "text-[10px] font-mono font-black",
+                                        stat.isCompleted ? "text-emerald-500" : "text-stone-400"
+                                    )}>
+                                        {stat.actual.toFixed(stat.mode === 'count' ? 0 : 1)}
+                                        <span className="mx-0.5 text-stone-300">/</span>
+                                        {stat.targetValue.toFixed(stat.mode === 'count' ? 0 : 1)}
+                                        {stat.mode === 'duration' ? 'h' : ''}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="h-1.5 bg-stone-100 rounded-full overflow-hidden relative z-10">
+                                <div 
+                                    className={cn(
+                                        "h-full rounded-full transition-all duration-1000 ease-out",
+                                        stat.isCompleted ? "bg-emerald-500" : ""
+                                    )} 
+                                    style={{ 
+                                        width: `${stat.progressPercent}%`, 
+                                        backgroundColor: stat.isCompleted ? undefined : stat.color 
+                                    }} 
+                                />
+                            </div>
+                        </div>
+                    ))}
+                    {dailyGoalStats.length === 0 && (
+                        <div className="col-span-full text-center py-6 bg-stone-50 rounded-2xl border border-dashed border-stone-200">
+                            <p className="text-[10px] font-bold text-stone-300 italic">在配置页为任务设定“目标”即可在此追踪</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* 今日时长分布 */}
             <div className="bg-white rounded-[2rem] border border-stone-200 p-6 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-2">
@@ -127,7 +218,6 @@ export const StatsView: React.FC<StatsViewProps> = ({
                 </div>
 
                 <div className="space-y-6 min-w-[300px]">
-                    {/* Weekday Labels Header */}
                     <div className="flex pl-20 pr-2 mb-2">
                         {weekRange.map((day, idx) => (
                             <div key={idx} className="flex-1 flex flex-col items-center gap-1">
@@ -140,7 +230,6 @@ export const StatsView: React.FC<StatsViewProps> = ({
 
                     {weeklyMatrixStats.map(task => (
                         <div key={task.id} className="flex items-center group">
-                            {/* Task Label */}
                             <div className="w-20 shrink-0 flex flex-col pr-3">
                                 <span className="text-[10px] font-black text-stone-700 truncate group-hover:text-primary transition-colors">
                                     {task.name}
@@ -150,7 +239,6 @@ export const StatsView: React.FC<StatsViewProps> = ({
                                 </span>
                             </div>
 
-                            {/* Daily Numbers Grid */}
                             <div className="flex-1 flex gap-1 items-center">
                                 {task.dailyData.map((day, idx) => {
                                     const hasData = day.hours > 0;
