@@ -21,6 +21,7 @@ export default function App() {
   
   const [state, setState] = useState<AppState>({
       tasks: [],
+      categoryOrder: [],
       ratingItems: [],
       shopItems: [],
       redemptions: [],
@@ -92,12 +93,30 @@ export default function App() {
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
-      setState(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === updatedTask.id ? updatedTask : t) }));
+      setState(prev => {
+          const newOrder = prev.categoryOrder.includes(updatedTask.category) 
+            ? prev.categoryOrder 
+            : [...prev.categoryOrder, updatedTask.category];
+          return {
+              ...prev,
+              tasks: prev.tasks.map(t => t.id === updatedTask.id ? updatedTask : t),
+              categoryOrder: newOrder
+          };
+      });
   };
 
   const handleAddTask = (newTaskPart: Omit<Task, 'id'>) => {
       const newTask = { ...newTaskPart, id: generateId() };
-      setState(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }));
+      setState(prev => {
+          const newOrder = prev.categoryOrder.includes(newTask.category) 
+            ? prev.categoryOrder 
+            : [...prev.categoryOrder, newTask.category];
+          return {
+              ...prev,
+              tasks: [...prev.tasks, newTask],
+              categoryOrder: newOrder
+          };
+      });
   };
 
   const handleDeleteTask = (taskId: string) => {
@@ -120,8 +139,17 @@ export default function App() {
               const h = parseInt(hKey);
               if (Array.isArray(newState.recurringSchedule[h])) newState.recurringSchedule[h] = newState.recurringSchedule[h].filter(id => id !== taskId);
           });
+          
+          // Optional: clean categoryOrder if no tasks left in that category
+          const remainingCats = new Set(newState.tasks.map(t => t.category));
+          newState.categoryOrder = newState.categoryOrder.filter(c => remainingCats.has(c));
+          
           return newState;
       });
+  };
+
+  const handleUpdateCategoryOrder = (newOrder: string[]) => {
+    setState(prev => ({ ...prev, categoryOrder: newOrder }));
   };
 
   const handleInstallApp = async () => {
@@ -162,6 +190,7 @@ export default function App() {
   const handleClearData = () => {
     setState({
       tasks: DEFAULT_TASKS,
+      categoryOrder: ['生活', '工作', '健康', '成长'],
       ratingItems: DEFAULT_RATING_ITEMS,
       shopItems: [],
       redemptions: [],
@@ -261,7 +290,7 @@ export default function App() {
         <main className="flex-1 overflow-hidden relative bg-white z-10">
           {activeTab === 'tracker' && (
             <TrackerView 
-                tasks={state.tasks} scheduleData={currentSchedule} recordData={currentRecord} 
+                tasks={state.tasks} categoryOrder={state.categoryOrder} scheduleData={currentSchedule} recordData={currentRecord} 
                 recurringData={state.recurringSchedule} allRecords={state.records}
                 onUpdateSchedule={updateScheduleHour} onUpdateRecord={updateRecordHour}
                 onUpdateRecurring={updateRecurringSchedule} onUpdateTask={handleUpdateTask}
@@ -281,7 +310,22 @@ export default function App() {
             />
           )}
           {activeTab === 'settings' && (
-            <SettingsTab tasks={state.tasks} onAddTask={handleAddTask} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} showInstallButton={!!installPrompt} onInstall={handleInstallApp} onExportData={handleExportData} onImportData={handleImportData} onClearData={handleClearData} allSchedules={state.schedule} allRecords={state.records} currentDate={currentDate} />
+            <SettingsTab 
+                tasks={state.tasks} 
+                categoryOrder={state.categoryOrder}
+                onAddTask={handleAddTask} 
+                onUpdateTask={handleUpdateTask} 
+                onDeleteTask={handleDeleteTask} 
+                onUpdateCategoryOrder={handleUpdateCategoryOrder}
+                showInstallButton={!!installPrompt} 
+                onInstall={handleInstallApp} 
+                onExportData={handleExportData} 
+                onImportData={handleImportData} 
+                onClearData={handleClearData} 
+                allSchedules={state.schedule} 
+                allRecords={state.records} 
+                currentDate={currentDate} 
+            />
           )}
         </main>
 

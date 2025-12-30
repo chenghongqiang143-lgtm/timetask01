@@ -50,6 +50,7 @@ export const loadState = (): AppState => {
     if (!serialized) {
       return {
         tasks: DEFAULT_TASKS,
+        categoryOrder: ['生活', '工作', '健康', '成长'],
         ratingItems: DEFAULT_RATING_ITEMS,
         shopItems: DEFAULT_SHOP_ITEMS,
         redemptions: [],
@@ -67,6 +68,12 @@ export const loadState = (): AppState => {
     if (!parsed.shopItems) parsed.shopItems = DEFAULT_SHOP_ITEMS;
     if (!parsed.redemptions) parsed.redemptions = [];
     
+    // categoryOrder migration
+    if (!parsed.categoryOrder) {
+      const cats = Array.from(new Set(parsed.tasks.map((t: Task) => t.category || '未分类'))) as string[];
+      parsed.categoryOrder = cats;
+    }
+
     // Ensure all ratings have the new structure
     Object.keys(parsed.ratings).forEach(date => {
         if (typeof parsed.ratings[date].score === 'number') {
@@ -84,6 +91,7 @@ export const loadState = (): AppState => {
     console.error("Failed to load state", e);
     return {
       tasks: DEFAULT_TASKS,
+      categoryOrder: ['生活', '工作', '健康', '成长'],
       ratingItems: DEFAULT_RATING_ITEMS,
       shopItems: DEFAULT_SHOP_ITEMS,
       redemptions: [],

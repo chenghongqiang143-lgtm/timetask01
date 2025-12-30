@@ -9,6 +9,7 @@ import { subDays, eachDayOfInterval } from 'date-fns';
 
 interface TrackerViewProps {
   tasks: Task[];
+  categoryOrder: string[];
   scheduleData: DayData;
   recordData: DayData;
   recurringData: Record<number, string[]>;
@@ -23,6 +24,7 @@ interface TrackerViewProps {
 
 export const TrackerView: React.FC<TrackerViewProps> = ({
   tasks,
+  categoryOrder,
   scheduleData,
   recordData,
   recurringData,
@@ -110,7 +112,12 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     setSidebar('left');
   };
 
-  const categories = Array.from(new Set(tasks.map(t => t.category || '未分类'))).sort();
+  const sortedCategories = useMemo(() => {
+    const existingCats = new Set(tasks.map(t => t.category || '未分类'));
+    const ordered = categoryOrder.filter(c => existingCats.has(c));
+    const others = Array.from(existingCats).filter(c => !categoryOrder.includes(c));
+    return [...ordered, ...others];
+  }, [tasks, categoryOrder]);
 
   const isTaskInActiveSlot = (taskId: string) => {
     if (!activeSlot) return false;
@@ -125,11 +132,11 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   };
 
   const TaskPool = () => (
-    <div className="flex-1 overflow-y-auto px-2.5 pb-32 space-y-4 pt-3">
-      {categories.map(cat => (
-        <div key={cat} className="space-y-1.5">
-          <div className="flex items-center gap-2 px-1">
-            <span className="text-[8px] font-black text-stone-400 uppercase tracking-[0.2em]">{cat}</span>
+    <div className="flex-1 overflow-y-auto px-2 pb-32 space-y-3 pt-2">
+      {sortedCategories.map(cat => (
+        <div key={cat} className="space-y-1">
+          <div className="flex items-center gap-1.5 px-1 opacity-70">
+            <span className="text-[8px] font-black text-stone-400 uppercase tracking-widest">{cat}</span>
             <div className="h-px flex-1 bg-stone-100" />
           </div>
           <div className="grid grid-cols-2 gap-1.5">
@@ -143,9 +150,9 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                   onClick={() => handleTaskToggle(task.id)}
                   onDoubleClick={() => { setEditingTask(task); setIsEditModalOpen(true); }}
                   className={cn(
-                    "group p-1.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col items-start justify-center min-h-[44px] select-none",
+                    "group p-2 rounded-lg border transition-all cursor-pointer relative overflow-hidden flex flex-col items-start justify-center min-h-[44px] select-none shadow-sm",
                     isSelected 
-                        ? "bg-white border-primary" 
+                        ? "bg-white border-primary ring-1 ring-primary/10" 
                         : "bg-white border-stone-100 hover:border-stone-200"
                   )}
                 >
@@ -159,18 +166,18 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     />
                   )}
 
-                  <div className="flex items-center gap-1.5 w-full relative z-10 mb-0.5">
+                  <div className="flex items-center gap-1.5 w-full relative z-10">
                     <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: task.color }} />
                     <span className={cn(
-                        "text-[10px] font-bold leading-tight truncate flex-1",
+                        "text-[11px] font-bold leading-tight truncate flex-1",
                         isSelected ? "text-primary" : "text-stone-700"
                     )}>{task.name}</span>
                   </div>
 
-                  <div className="flex items-center justify-between w-full relative z-10 pl-3">
+                  <div className="flex items-center justify-between w-full relative z-10 pl-3 mt-0.5">
                     <div className="flex items-center gap-1">
                       {progress && (
-                        <span className="text-[7px] font-mono font-black text-stone-300">
+                        <span className="text-[8px] font-mono font-black text-stone-300">
                           {progress.percentage === 100 ? '✓' : `${Math.round(progress.percentage)}%`}
                         </span>
                       )}
@@ -194,14 +201,14 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   const SidebarHeader = ({ type }: { type: 'schedule' | 'record' }) => {
     const isSchedule = type === 'schedule';
     return (
-      <div className="p-3 border-b border-stone-100 bg-white shrink-0 flex flex-col gap-2">
+      <div className="p-2.5 border-b border-stone-100 bg-white shrink-0 flex flex-col gap-2">
         <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
                 <div className={cn("p-1.5 rounded-lg", isSchedule ? "bg-indigo-50 text-indigo-500" : "bg-emerald-50 text-emerald-500")}>
                     {isSchedule ? <Repeat size={12} /> : <Check size={12} />}
                 </div>
                 <div>
-                    <h3 className="text-[11px] font-black text-stone-800 tracking-tight leading-none">
+                    <h3 className="text-[10px] font-black text-stone-800 tracking-tight leading-none">
                         {activeSlot ? `${activeSlot.hour}:00` : ''} {isSchedule ? '安排' : '记录'}
                     </h3>
                     <p className="text-[7px] font-bold text-stone-400 uppercase tracking-widest mt-0.5">
@@ -209,7 +216,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     </p>
                 </div>
             </div>
-            <button onClick={closeSidebar} className="p-1.5 hover:bg-stone-100 rounded-full transition-colors text-stone-400">
+            <button onClick={closeSidebar} className="p-1 text-stone-300 hover:text-stone-500 transition-colors">
                 <X size={16} />
             </button>
         </div>
@@ -217,7 +224,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         <div className="flex gap-1.5">
             <button 
                 onClick={clearActiveSlot}
-                className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-stone-50 hover:bg-red-50 hover:text-red-500 rounded-lg text-[9px] font-bold text-stone-500 transition-all border border-stone-100 active:scale-95"
+                className="flex-1 flex items-center justify-center gap-1 py-1.5 px-2 bg-stone-50 hover:bg-red-50 hover:text-red-500 rounded-lg text-[8px] font-bold text-stone-500 transition-all border border-stone-100 active:scale-95"
             >
                 <Eraser size={10} /> 清空
             </button>
@@ -225,7 +232,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 <button 
                     onClick={() => setIsRepeatMode(!isRepeatMode)}
                     className={cn(
-                        "flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[9px] font-bold transition-all border active:scale-95",
+                        "flex-1 flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-[8px] font-bold transition-all border active:scale-95",
                         isRepeatMode 
                             ? "bg-indigo-500 border-indigo-500 text-white" 
                             : "bg-white border-stone-100 text-stone-500 hover:border-indigo-100 hover:text-indigo-500"
@@ -248,7 +255,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         <SidebarHeader type="record" />
         <TaskPool />
         <div className="p-3 bg-white border-t border-stone-100 shrink-0">
-            <button onClick={closeSidebar} className="w-full py-2.5 bg-stone-900 text-white rounded-xl text-[11px] font-bold active:scale-95 transition-transform">完成记录</button>
+            <button onClick={closeSidebar} className="w-full py-2 bg-stone-900 text-white rounded-xl text-[10px] font-bold active:scale-95 transition-transform">完成记录</button>
         </div>
       </div>
 
@@ -282,7 +289,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         <SidebarHeader type="schedule" />
         <TaskPool />
         <div className="p-3 bg-white border-t border-stone-100 shrink-0">
-            <button onClick={closeSidebar} className="w-full py-2.5 bg-stone-900 text-white rounded-xl text-[11px] font-bold active:scale-95 transition-transform">确认安排</button>
+            <button onClick={closeSidebar} className="w-full py-2 bg-stone-900 text-white rounded-xl text-[10px] font-bold active:scale-95 transition-transform">确认安排</button>
         </div>
       </div>
 

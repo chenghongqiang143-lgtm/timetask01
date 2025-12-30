@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Task } from '../types';
 import { getContrastColor, cn } from '../utils';
@@ -69,7 +70,7 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
     >
       <div className="flex items-center gap-2 overflow-hidden flex-1">
         <span 
-            className="font-normal text-[13px] sm:text-sm truncate leading-tight tracking-wide"
+            className="font-bold text-[13px] sm:text-[14px] truncate leading-tight tracking-wide"
             style={{ color: textColor }}
         >
           {task.name}
@@ -78,7 +79,7 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
       
       <div className="flex items-center gap-1">
         {hasTargets && (
-            <Target size={12} color={textColor} className="opacity-70" />
+            <Target size={14} color={textColor} className="opacity-70" />
         )}
         
         {showEditIcon && (
@@ -88,7 +89,7 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
                     textColor === '#ffffff' ? "hover:bg-white/20" : "hover:bg-black/10"
                 )}
             >
-                <Edit2 size={12} color={textColor} />
+                <Edit2 size={14} color={textColor} />
             </div>
         )}
       </div>

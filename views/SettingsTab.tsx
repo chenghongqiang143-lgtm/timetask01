@@ -2,15 +2,17 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Task, DayData, HOURS } from '../types';
 import { TaskEditorModal } from '../components/TaskEditorModal';
-import { Plus, Download, Upload, Smartphone, ChevronRight, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Download, Upload, Smartphone, ChevronRight, Trash2, AlertTriangle, ArrowUp, ArrowDown, ListOrdered } from 'lucide-react';
 import { subDays, eachDayOfInterval } from 'date-fns';
 import { formatDate, cn } from '../utils';
 
 interface SettingsTabProps {
   tasks: Task[];
+  categoryOrder: string[];
   onAddTask: (task: Task) => void;
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (taskId: string) => void;
+  onUpdateCategoryOrder: (newOrder: string[]) => void;
   showInstallButton: boolean;
   onInstall: () => void;
   onExportData: () => void;
@@ -23,9 +25,11 @@ interface SettingsTabProps {
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
   tasks,
+  categoryOrder,
   onAddTask,
   onUpdateTask,
   onDeleteTask,
+  onUpdateCategoryOrder,
   showInstallButton,
   onInstall,
   onExportData,
@@ -38,9 +42,15 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const categories = Array.from(new Set(tasks.map(t => t.category)));
+  const sortedCategories = useMemo(() => {
+    const existingCats = Array.from(new Set(tasks.map(t => t.category || '未分类')));
+    const ordered = categoryOrder.filter(c => existingCats.includes(c));
+    const others = existingCats.filter(c => !categoryOrder.includes(c));
+    return [...ordered, ...others];
+  }, [tasks, categoryOrder]);
 
   const getTaskProgress = (task: Task) => {
       if (!task.targets || !task.targets.frequency) return 0;
@@ -103,30 +113,80 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       return `${days}天`;
   };
 
+  const moveCategory = (index: number, direction: 'up' | 'down') => {
+    const newOrder = [...sortedCategories];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newOrder.length) return;
+    [newOrder[index], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[index]];
+    onUpdateCategoryOrder(newOrder);
+  };
+
   return (
     <div className="h-full bg-white overflow-y-auto custom-scrollbar relative">
       <div className="relative z-10 px-5 pt-6 pb-2 flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-stone-800 tracking-tight">配置</h2>
         </div>
-        <button 
-            onClick={handleNew}
-            className="bg-stone-900 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-stone-800 transition-all active:scale-95"
-        >
-            <Plus size={16} />
-        </button>
+        <div className="flex gap-2">
+            <button 
+                onClick={() => setShowCategoryManager(!showCategoryManager)}
+                className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-95 border",
+                    showCategoryManager ? "bg-primary text-white border-primary" : "bg-white text-stone-400 border-stone-200"
+                )}
+                title="调整分类排序"
+            >
+                <ListOrdered size={16} />
+            </button>
+            <button 
+                onClick={handleNew}
+                className="bg-stone-900 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-stone-800 transition-all active:scale-95 shadow-sm"
+            >
+                <Plus size={16} />
+            </button>
+        </div>
       </div>
 
       <div className="relative z-10 px-5 pb-24 space-y-6">
+        
+        {showCategoryManager && (
+            <div className="bg-stone-50 rounded-2xl p-4 border border-stone-100 animate-in fade-in slide-in-from-top-2 duration-300">
+                <h3 className="text-[10px] font-black text-stone-400 uppercase tracking-widest mb-3 px-1">调整分类排序</h3>
+                <div className="space-y-2">
+                    {sortedCategories.map((cat, idx) => (
+                        <div key={cat} className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-stone-200 shadow-sm">
+                            <span className="text-xs font-bold text-stone-700">{cat}</span>
+                            <div className="flex gap-1">
+                                <button 
+                                    onClick={() => moveCategory(idx, 'up')}
+                                    disabled={idx === 0}
+                                    className="p-1.5 text-stone-400 hover:text-primary disabled:opacity-20"
+                                >
+                                    <ArrowUp size={14} />
+                                </button>
+                                <button 
+                                    onClick={() => moveCategory(idx, 'down')}
+                                    disabled={idx === sortedCategories.length - 1}
+                                    className="p-1.5 text-stone-400 hover:text-primary disabled:opacity-20"
+                                >
+                                    <ArrowDown size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
         <div className="space-y-4">
-           {categories.map(cat => (
+           {sortedCategories.map(cat => (
               <div key={cat}>
                   <div className="flex items-center gap-2 mb-2 px-1">
                       <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest">{cat}</span>
                       <div className="h-px bg-stone-100 flex-1"></div>
                   </div>
                   <div className="grid grid-cols-2 gap-2.5">
-                      {tasks.filter(t => t.category === cat).map(task => {
+                      {tasks.filter(t => (t.category || '未分类') === cat).map(task => {
                           const targetVal = task.targets ? (task.targets.value || (task.targets as any).duration || 0) : 0;
                           const hasTarget = targetVal > 0;
                           const currentProgress = hasTarget ? getTaskProgress(task) : 0;
@@ -232,7 +292,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                 </button>
             </div>
             <div className="text-center mt-4">
-                <span className="text-[9px] text-stone-300 font-medium tracking-wide">ChronosFlow v1.0.2</span>
+                <span className="text-[9px] text-stone-300 font-medium tracking-wide">ChronosFlow v1.0.3</span>
             </div>
         </div>
       </div>

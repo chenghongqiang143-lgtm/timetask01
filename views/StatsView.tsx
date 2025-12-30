@@ -1,9 +1,10 @@
 
 import React, { useMemo } from 'react';
 import { Task, DayData, HOURS } from '../types';
-import { CalendarRange, Clock } from 'lucide-react';
-import { startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
-import { formatDate } from '../utils';
+import { CalendarRange, Clock, TrendingUp } from 'lucide-react';
+import { startOfWeek, endOfWeek, eachDayOfInterval, format } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
+import { formatDate, cn } from '../utils';
 
 interface StatsViewProps {
   tasks: Task[];
@@ -22,114 +23,170 @@ export const StatsView: React.FC<StatsViewProps> = ({
   allRecords,
   dateObj
 }) => {
-  const calculateStatsForRange = (start: Date, end: Date) => {
-    const days = eachDayOfInterval({ start, end });
-    const taskAccumulator: Record<string, { planned: number, actual: number, actualCount: number }> = {};
-    tasks.forEach(t => taskAccumulator[t.id] = { planned: 0, actual: 0, actualCount: 0 });
+  const weekRange = useMemo(() => {
+    const start = startOfWeek(dateObj, { weekStartsOn: 1 });
+    const end = endOfWeek(dateObj, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start, end });
+  }, [dateObj]);
 
-    days.forEach(day => {
+  const calculateTodayStats = useMemo(() => {
+    const dKey = formatDate(dateObj);
+    const recHours = allRecords[dKey]?.hours || {};
+    const schedHours = allSchedules[dKey]?.hours || {};
+    
+    return tasks.map(t => {
+      let planned = 0;
+      let actual = 0;
+      
+      HOURS.forEach(h => {
+        const specificPlan = schedHours[h] || [];
+        const recurringPlan = recurringSchedule[h] || [];
+        const uniquePlan = Array.from(new Set([...specificPlan, ...recurringPlan]));
+        const actualRec = recHours[h] || [];
+
+        if (uniquePlan.includes(t.id)) planned += 1;
+        actualRec.forEach(tid => {
+          if (tid === t.id) actual += (1 / (actualRec.length || 1));
+        });
+      });
+      
+      return { ...t, planned, actual, execRatio: planned > 0 ? (actual / planned) * 100 : (actual > 0 ? 100 : 0) };
+    }).filter(t => t.actual > 0 || t.planned > 0).sort((a, b) => b.actual - a.actual);
+  }, [dateObj, allRecords, allSchedules, recurringSchedule, tasks]);
+
+  const weeklyMatrixStats = useMemo(() => {
+    return tasks.map(t => {
+      const dailyData = weekRange.map(day => {
         const dKey = formatDate(day);
         const recHours = allRecords[dKey]?.hours || {};
-        const schedHours = allSchedules[dKey]?.hours || {};
-
-        HOURS.forEach(h => {
-            const specificPlan = schedHours[h] || [];
-            const recurringPlan = recurringSchedule[h] || [];
-            const uniquePlan = Array.from(new Set([...specificPlan, ...recurringPlan]));
-            const actualRec = recHours[h] || [];
-
-            uniquePlan.forEach(tid => { if (taskAccumulator[tid]) taskAccumulator[tid].planned += 1; });
-            actualRec.forEach(tid => {
-                 if (taskAccumulator[tid]) {
-                    taskAccumulator[tid].actual += (1 / (actualRec.length || 1));
-                    taskAccumulator[tid].actualCount += 1;
-                 }
-            });
-        });
-    });
-
-    return tasks.map(t => {
-        const stats = taskAccumulator[t.id];
-        const planned = stats.planned;
-        const actual = stats.actual;
-        const hasData = planned > 0 || actual > 0;
-        const execRatio = planned > 0 ? (actual / planned) * 100 : (actual > 0 ? 100 : 0);
+        let dayActual = 0;
         
-        return { ...t, plannedTotal: planned, actualTotal: actual, execRatio, hasData };
-    })
-    .filter(t => t.hasData) // Allow tasks without targets to be shown if they have data
-    .sort((a, b) => b.actualTotal - a.actualTotal); // Sort by actual duration as requested
-  };
+        HOURS.forEach(h => {
+          const actualRec = recHours[h] || [];
+          actualRec.forEach(tid => {
+            if (tid === t.id) dayActual += (1 / (actualRec.length || 1));
+          });
+        });
+        return { date: dKey, hours: dayActual };
+      });
 
-  const todaySummaryStats = useMemo(() => calculateStatsForRange(dateObj, dateObj), [dateObj, allRecords, allSchedules, recurringSchedule, tasks]);
-  const weeklySummaryStats = useMemo(() => {
-      const start = startOfWeek(dateObj, { weekStartsOn: 1 });
-      const end = endOfWeek(dateObj, { weekStartsOn: 1 });
-      return calculateStatsForRange(start, end);
-  }, [dateObj, allRecords, allSchedules, recurringSchedule, tasks]);
+      const totalWeekHours = dailyData.reduce((acc, curr) => acc + curr.hours, 0);
+      return { ...t, dailyData, totalWeekHours };
+    }).filter(t => t.totalWeekHours > 0).sort((a, b) => b.totalWeekHours - a.totalWeekHours);
+  }, [weekRange, allRecords, tasks]);
 
   return (
     <div className="flex flex-col h-full bg-white overflow-y-auto custom-scrollbar pb-32">
-        <div className="p-4 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Today's Summary */}
-                <div className="bg-white rounded-[2rem] border border-stone-200 p-6 flex flex-col min-h-[300px]">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-2">
-                            <Clock size={14} className="text-secondary" />
-                            今日统计
-                        </h3>
-                        <div className="text-[10px] font-bold text-stone-400">实录 / 计划</div>
-                    </div>
-                    <div className="space-y-4 flex-1">
-                        {todaySummaryStats.map(stat => (
-                            <div key={stat.id} className="flex flex-col gap-2">
-                                <div className="flex justify-between items-end px-0.5">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: stat.color }} />
-                                        <span className="text-[11px] font-bold text-stone-700 truncate">{stat.name}</span>
-                                    </div>
-                                    <div className="text-[10px] font-bold font-mono text-stone-500">
-                                        {stat.actualTotal.toFixed(1)} <span className="text-stone-300 mx-0.5">/</span> {stat.plannedTotal.toFixed(1)}h
-                                    </div>
+        <div className="p-4 space-y-6">
+            
+            {/* Today's Summary */}
+            <div className="bg-white rounded-[2rem] border border-stone-200 p-6 shadow-sm">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-2">
+                        <Clock size={14} className="text-secondary" />
+                        今日时长分布
+                    </h3>
+                    <div className="text-[10px] font-bold text-stone-400">实录时长</div>
+                </div>
+                <div className="space-y-4">
+                    {calculateTodayStats.map(stat => (
+                        <div key={stat.id} className="group">
+                            <div className="flex justify-between items-end mb-1.5 px-0.5">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: stat.color }} />
+                                    <span className="text-[11px] font-bold text-stone-700">{stat.name}</span>
                                 </div>
-                                <div className="h-4 bg-stone-50 rounded-full overflow-hidden border border-stone-100 shadow-inner">
-                                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(stat.execRatio, 100)}%`, backgroundColor: stat.color }} />
+                                <div className="text-[10px] font-bold font-mono text-stone-500">
+                                    {stat.actual.toFixed(1)}h
                                 </div>
                             </div>
-                        ))}
-                        {todaySummaryStats.length === 0 && <p className="text-center text-xs text-stone-300 py-10 italic">今日暂无记录</p>}
-                    </div>
+                            <div className="h-2.5 bg-stone-50 rounded-full overflow-hidden border border-stone-100">
+                                <div 
+                                    className="h-full rounded-full transition-all duration-1000 ease-out" 
+                                    style={{ width: `${Math.min((stat.actual / 12) * 100, 100)}%`, backgroundColor: stat.color }} 
+                                />
+                            </div>
+                        </div>
+                    ))}
+                    {calculateTodayStats.length === 0 && (
+                        <div className="text-center py-10">
+                            <p className="text-xs text-stone-300 italic">今日尚未记录任何活动</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Weekly Daily Breakdown */}
+            <div className="bg-white rounded-[2rem] border border-stone-200 p-6 shadow-sm overflow-hidden">
+                <div className="flex justify-between items-center mb-8">
+                    <h3 className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-2">
+                        <TrendingUp size={14} className="text-primary" />
+                        本周每日趋势
+                    </h3>
+                    <div className="text-[10px] font-bold text-stone-400">时长数值 (h)</div>
                 </div>
 
-                {/* Weekly Summary */}
-                <div className="bg-white rounded-[2rem] border border-stone-200 p-6 flex flex-col min-h-[300px]">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-2">
-                            <CalendarRange size={14} className="text-primary" />
-                            本周汇总
-                        </h3>
-                        <div className="text-[10px] font-bold text-stone-400">实录 / 计划</div>
-                    </div>
-                    <div className="space-y-4 flex-1">
-                        {weeklySummaryStats.map(stat => (
-                            <div key={stat.id} className="flex flex-col gap-2">
-                                <div className="flex justify-between items-end px-0.5">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: stat.color }} />
-                                        <span className="text-[11px] font-bold text-stone-700 truncate">{stat.name}</span>
-                                    </div>
-                                    <div className="text-[10px] font-bold font-mono text-stone-500">
-                                        {stat.actualTotal.toFixed(1)} <span className="text-stone-300 mx-0.5">/</span> {stat.plannedTotal.toFixed(1)}h
-                                    </div>
-                                </div>
-                                <div className="h-4 bg-stone-100 rounded-full overflow-hidden border border-stone-100 shadow-inner">
-                                    <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${Math.min(stat.execRatio, 100)}%`, backgroundColor: stat.color }} />
-                                </div>
+                <div className="space-y-6 min-w-[300px]">
+                    {/* Weekday Labels Header */}
+                    <div className="flex pl-20 pr-2 mb-2">
+                        {weekRange.map((day, idx) => (
+                            <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+                                <span className="text-[8px] font-black text-stone-300 uppercase">
+                                    {format(day, 'EE', { locale: zhCN }).replace('周', '')}
+                                </span>
                             </div>
                         ))}
-                        {weeklySummaryStats.length === 0 && <p className="text-center text-xs text-stone-300 py-10 italic">本周暂无记录</p>}
                     </div>
+
+                    {weeklyMatrixStats.map(task => (
+                        <div key={task.id} className="flex items-center group">
+                            {/* Task Label */}
+                            <div className="w-20 shrink-0 flex flex-col pr-3">
+                                <span className="text-[10px] font-black text-stone-700 truncate group-hover:text-primary transition-colors">
+                                    {task.name}
+                                </span>
+                                <span className="text-[8px] font-mono font-bold text-stone-400">
+                                    ∑{task.totalWeekHours.toFixed(1)}
+                                </span>
+                            </div>
+
+                            {/* Daily Numbers Grid */}
+                            <div className="flex-1 flex gap-1 items-center">
+                                {task.dailyData.map((day, idx) => {
+                                    const hasData = day.hours > 0;
+                                    return (
+                                        <div 
+                                            key={idx}
+                                            className={cn(
+                                                "flex-1 h-8 rounded-lg flex items-center justify-center transition-all",
+                                                hasData ? "border border-stone-100" : "opacity-20"
+                                            )}
+                                            style={{ 
+                                                backgroundColor: hasData ? `${task.color}15` : 'transparent',
+                                            }}
+                                        >
+                                            <span 
+                                                className={cn(
+                                                    "text-[9px] font-mono font-black",
+                                                    hasData ? "" : "text-stone-300"
+                                                )}
+                                                style={{ color: hasData ? task.color : undefined }}
+                                            >
+                                                {hasData ? day.hours.toFixed(1) : '0'}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))}
+
+                    {weeklyMatrixStats.length === 0 && (
+                        <div className="text-center py-16">
+                            <CalendarRange size={32} className="mx-auto text-stone-100 mb-3" />
+                            <p className="text-xs text-stone-300 italic">本周暂无投入记录</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

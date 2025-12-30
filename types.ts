@@ -50,6 +50,7 @@ export type Tab = 'tracker' | 'stats' | 'rating' | 'settings';
 
 export interface AppState {
   tasks: Task[];
+  categoryOrder: string[];
   ratingItems: RatingItem[];
   shopItems: ShopItem[];
   redemptions: Redemption[];
