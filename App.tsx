@@ -230,21 +230,6 @@ export default function App() {
         
         <header className="pt-8 sm:pt-10 pb-4 px-6 bg-white flex items-center justify-between z-40 select-none shrink-0 border-b border-stone-100">
            <div className="w-16 sm:w-24 flex justify-start items-center gap-2">
-                <div className="relative w-10 h-10">
-                   <button 
-                        onClick={triggerDatePicker}
-                        className="w-full h-full flex items-center justify-center rounded-full bg-stone-50 text-stone-600 hover:bg-stone-100 transition-all active:scale-95 border border-stone-200"
-                   >
-                       <CalendarDays size={20} />
-                   </button>
-                   <input 
-                        ref={dateInputRef} 
-                        type="date" 
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                        value={format(currentDate, 'yyyy-MM-dd')} 
-                        onChange={handleDateSelect} 
-                   />
-                </div>
                 {!isSelectedToday && (
                   <button 
                     onClick={goToToday}
@@ -255,22 +240,31 @@ export default function App() {
                 )}
            </div>
            
-           <div className="flex-1 flex items-center justify-center gap-2 sm:gap-6">
+           <div className="flex-1 flex items-center justify-center gap-4 sm:gap-12">
                 <button onClick={() => setCurrentDate(subDays(currentDate, 1))} className="p-2 text-stone-400 hover:text-stone-800 hover:bg-stone-50 rounded-full transition-all active:scale-75">
                     <ChevronLeft size={24} />
                 </button>
                 
-                <button 
-                  onClick={triggerDatePicker}
-                  className="flex flex-col items-center justify-center text-center group hover:bg-stone-50 px-4 py-2 rounded-2xl transition-all active:scale-95"
-                >
-                    <span className="font-black text-xl sm:text-2xl text-stone-800 tracking-tight leading-none group-hover:text-primary transition-colors">
-                        {format(currentDate, 'M月d日', { locale: zhCN })}
-                    </span>
-                    <span className="text-[10px] sm:text-xs font-bold text-stone-400 uppercase tracking-[0.2em] mt-1 group-hover:text-stone-600">
-                        {format(currentDate, 'EEEE', { locale: zhCN })}
-                    </span>
-                </button>
+                <div className="relative">
+                  <button 
+                    onClick={triggerDatePicker}
+                    className="flex flex-col items-center justify-center text-center group hover:bg-stone-50 px-4 py-2 rounded-2xl transition-all active:scale-95"
+                  >
+                      <span className="font-black text-xl sm:text-2xl text-stone-800 tracking-tight leading-none group-hover:text-primary transition-colors whitespace-nowrap">
+                          {format(currentDate, 'M月d日', { locale: zhCN })}
+                      </span>
+                      <span className="text-[10px] sm:text-xs font-bold text-stone-400 uppercase tracking-[0.2em] mt-1 group-hover:text-stone-600">
+                          {format(currentDate, 'EEEE', { locale: zhCN })}
+                      </span>
+                  </button>
+                  <input 
+                      ref={dateInputRef} 
+                      type="date" 
+                      className="absolute inset-0 w-full h-full opacity-0 pointer-events-none" 
+                      value={format(currentDate, 'yyyy-MM-dd')} 
+                      onChange={handleDateSelect} 
+                  />
+                </div>
 
                 <button onClick={() => setCurrentDate(addDays(currentDate, 1))} className="p-2 text-stone-400 hover:text-stone-800 hover:bg-stone-50 rounded-full transition-all active:scale-75">
                     <ChevronRight size={24} />
@@ -297,7 +291,7 @@ export default function App() {
            </div>
         </header>
 
-        <main className="flex-1 overflow-hidden relative bg-white z-10">
+        <main className="flex-1 overflow-hidden relative bg-white">
           {activeTab === 'tracker' && (
             <TrackerView 
                 tasks={state.tasks} categoryOrder={state.categoryOrder} scheduleData={currentSchedule} recordData={currentRecord} 

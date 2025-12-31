@@ -136,7 +136,7 @@ export const RatingView: React.FC<RatingViewProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/60 p-2 sm:p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/60 p-2 sm:p-4 backdrop-blur-sm">
             <div className="bg-white rounded-[1.5rem] sm:rounded-[2rem] w-full max-w-lg flex flex-col border border-stone-300 shadow-2xl overflow-hidden max-h-[85vh]">
                 <div className="px-4 py-4 sm:px-6 sm:py-5 bg-stone-50 border-b border-stone-200 flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-2.5">
@@ -220,7 +220,7 @@ export const RatingView: React.FC<RatingViewProps> = ({
   const ShopModal = () => {
       const canAfford = (cost: number) => balance >= cost;
       return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm">
             <div className="bg-white rounded-[2rem] w-full max-w-lg flex flex-col border border-stone-300 shadow-2xl overflow-hidden max-h-[85vh]">
                 <div className="px-5 py-4 bg-emerald-50 border-b border-emerald-100 flex justify-between items-center shrink-0">
                     <div className="flex items-center gap-2.5">
@@ -413,9 +413,9 @@ export const RatingView: React.FC<RatingViewProps> = ({
 
       {/* Item Configuration Modal */}
       {isConfigModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm">
             <div className="bg-white rounded-[2.5rem] w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col border border-stone-300 shadow-2xl">
-                <div className="px-6 py-5 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
+                <div className="px-6 py-5 bg-stone-50 border-b border-stone-200 flex justify-between items-center shrink-0">
                     <h3 className="font-black text-stone-800 text-sm">维度配置</h3>
                     <button onClick={() => setIsConfigModalOpen(false)} className="p-2 hover:bg-stone-200 rounded-full transition-colors text-stone-400">
                         <X size={20} />
@@ -448,9 +448,9 @@ export const RatingView: React.FC<RatingViewProps> = ({
 
       {/* Shop Item Editor Modal */}
       {editingShopItem && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/80 p-4 backdrop-blur-md">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-stone-900/80 p-4 backdrop-blur-md">
               <div className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden flex flex-col border border-stone-400 shadow-2xl">
-                  <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
+                  <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center shrink-0">
                       <h3 className="font-black text-sm text-stone-800">奖励设置</h3>
                       <button onClick={() => { setEditingShopItem(null); setDeleteConfirmId(null); }} className="p-2 hover:bg-stone-200 rounded-full transition-colors text-stone-400">
                         <X size={18} />
@@ -475,7 +475,7 @@ export const RatingView: React.FC<RatingViewProps> = ({
                           </div>
                       </div>
                   </div>
-                  <div className="p-4 bg-stone-50 border-t border-stone-200 flex gap-2">
+                  <div className="p-4 bg-stone-50 border-t border-stone-200 flex gap-2 shrink-0">
                       <button 
                         onClick={() => handleDeleteShopItem(editingShopItem.id)} 
                         className={cn(
@@ -506,9 +506,9 @@ export const RatingView: React.FC<RatingViewProps> = ({
 
       {/* Score Dimension Editor Modal */}
       {editingItem && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/80 p-4">
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-stone-900/80 p-4">
               <div className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden flex flex-col border border-stone-400 shadow-2xl">
-                  <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center">
+                  <div className="px-6 py-4 bg-stone-50 border-b border-stone-200 flex justify-between items-center shrink-0">
                       <h3 className="font-black text-sm text-stone-800">编辑维度</h3>
                       <button onClick={() => setEditingItem(null)} className="p-2 hover:bg-stone-200 rounded-full transition-colors text-stone-400"><X size={18} /></button>
                   </div>
@@ -529,7 +529,7 @@ export const RatingView: React.FC<RatingViewProps> = ({
                           ))}
                       </div>
                   </div>
-                  <div className="p-4 bg-stone-50 border-t border-stone-200 flex gap-2">
+                  <div className="p-4 bg-stone-50 border-t border-stone-200 flex gap-2 shrink-0">
                       <button onClick={() => setEditingItem(null)} className="flex-1 py-3 bg-white border border-stone-200 rounded-xl text-xs font-bold text-stone-400">取消</button>
                       <button onClick={() => saveRatingItem(editingItem)} disabled={!editingItem.name.trim()} className="flex-1 py-3 bg-stone-900 text-white rounded-xl text-xs font-bold disabled:opacity-50">保存</button>
                   </div>
