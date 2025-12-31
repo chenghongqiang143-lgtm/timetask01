@@ -37,7 +37,7 @@ export const TimelineRow: React.FC<TimelineRowProps> = ({
         {tasks.map((task, idx) => (
           <div
             key={`${task.id}-${idx}`}
-            className="flex-1 h-full rounded-md flex items-center justify-center text-[9px] font-bold tracking-tight truncate px-1 leading-none transition-all animate-in fade-in slide-in-from-bottom-1 duration-500 border border-black/5"
+            className="flex-1 h-full rounded-md flex items-center justify-center text-[11px] font-normal tracking-tight truncate px-1 leading-none transition-all animate-in fade-in slide-in-from-bottom-1 duration-500 border border-black/5"
             style={{ 
               backgroundColor: task.color, 
               color: getContrastColor(task.color),

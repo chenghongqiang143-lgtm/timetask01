@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { BarChart2, Settings, ChevronLeft, ChevronRight, CalendarDays, Activity, Star, LayoutGrid, ClipboardCheck } from 'lucide-react';
-import { format, addDays, subDays } from 'date-fns';
+import { BarChart2, Settings, ChevronLeft, ChevronRight, CalendarDays, Activity, Star, ClipboardCheck, TrendingUp } from 'lucide-react';
+import { format, addDays, subDays, isToday } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { AppState, Tab, Task, DayData, DayRating, RatingItem, Redemption, ShopItem } from './types';
 import { loadState, saveState, DEFAULT_TASKS, DEFAULT_RATING_ITEMS } from './services/storage';
@@ -218,13 +218,19 @@ export default function App() {
     }
   };
 
+  const goToToday = () => {
+    setCurrentDate(new Date());
+  };
+
+  const isSelectedToday = isToday(currentDate);
+
   return (
     <div className="h-screen w-screen bg-stone-100 flex items-center justify-center overflow-hidden font-sans text-stone-800 p-0 sm:p-4">
       <div className="w-full h-full sm:max-w-6xl sm:h-[94vh] sm:max-h-[1000px] bg-white sm:rounded-[2rem] flex flex-col relative border border-stone-200 shadow-2xl overflow-hidden">
         
         <header className="pt-8 sm:pt-10 pb-4 px-6 bg-white flex items-center justify-between z-40 select-none shrink-0 border-b border-stone-100">
-           <div className="w-12 sm:w-24 flex justify-start">
-               <div className="relative w-10 h-10 flex items-center justify-center">
+           <div className="w-16 sm:w-24 flex justify-start items-center gap-2">
+                <div className="relative w-10 h-10">
                    <button 
                         onClick={triggerDatePicker}
                         className="w-full h-full flex items-center justify-center rounded-full bg-stone-50 text-stone-600 hover:bg-stone-100 transition-all active:scale-95 border border-stone-200"
@@ -238,33 +244,54 @@ export default function App() {
                         value={format(currentDate, 'yyyy-MM-dd')} 
                         onChange={handleDateSelect} 
                    />
-               </div>
+                </div>
+                {!isSelectedToday && (
+                  <button 
+                    onClick={goToToday}
+                    className="hidden sm:flex text-[10px] font-black px-2 py-1 bg-primary/10 text-primary border border-primary/20 rounded-lg hover:bg-primary/20 transition-all active:scale-90"
+                  >
+                    今天
+                  </button>
+                )}
            </div>
            
-           <div className="flex-1 flex items-center justify-center gap-3 sm:gap-6">
-                <button onClick={() => setCurrentDate(subDays(currentDate, 1))} className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-50 rounded-full transition-all active:scale-75">
+           <div className="flex-1 flex items-center justify-center gap-2 sm:gap-6">
+                <button onClick={() => setCurrentDate(subDays(currentDate, 1))} className="p-2 text-stone-400 hover:text-stone-800 hover:bg-stone-50 rounded-full transition-all active:scale-75">
                     <ChevronLeft size={24} />
                 </button>
-                <div className="flex flex-col items-center justify-center text-center">
-                    <span className="font-bold text-lg sm:text-2xl text-stone-800 tracking-tight leading-none">
+                
+                <button 
+                  onClick={triggerDatePicker}
+                  className="flex flex-col items-center justify-center text-center group hover:bg-stone-50 px-4 py-2 rounded-2xl transition-all active:scale-95"
+                >
+                    <span className="font-black text-xl sm:text-2xl text-stone-800 tracking-tight leading-none group-hover:text-primary transition-colors">
                         {format(currentDate, 'M月d日', { locale: zhCN })}
                     </span>
-                    <span className="text-[10px] sm:text-xs font-bold text-stone-400 uppercase tracking-widest mt-1">
+                    <span className="text-[10px] sm:text-xs font-bold text-stone-400 uppercase tracking-[0.2em] mt-1 group-hover:text-stone-600">
                         {format(currentDate, 'EEEE', { locale: zhCN })}
                     </span>
-                </div>
-                <button onClick={() => setCurrentDate(addDays(currentDate, 1))} className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-50 rounded-full transition-all active:scale-75">
+                </button>
+
+                <button onClick={() => setCurrentDate(addDays(currentDate, 1))} className="p-2 text-stone-400 hover:text-stone-800 hover:bg-stone-50 rounded-full transition-all active:scale-75">
                     <ChevronRight size={24} />
                 </button>
            </div>
            
-           <div className="w-12 sm:w-24 flex justify-end">
+           <div className="w-16 sm:w-24 flex justify-end items-center gap-2">
+             {!isSelectedToday && (
+               <button 
+                 onClick={goToToday}
+                 className="flex sm:hidden w-8 h-8 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20 transition-all active:scale-90"
+               >
+                 <span className="text-[10px] font-black">今</span>
+               </button>
+             )}
              {activeTab === 'rating' && (
                 <button 
                  onClick={() => setIsRatingStatsOpen(true)}
                  className="w-10 h-10 flex items-center justify-center rounded-full bg-stone-50 text-stone-600 hover:bg-stone-100 transition-all active:scale-95 border border-stone-200"
                 >
-                  <BarChart2 size={20} />
+                  <TrendingUp size={20} />
                 </button>
               )}
            </div>
