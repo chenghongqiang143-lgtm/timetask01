@@ -36,8 +36,6 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
   onDrop
 }) => {
   const textColor = getContrastColor(task.color);
-  
-  // Check if task has valid target set (handling legacy 'duration' or new 'value')
   const hasTargets = task.targets && (task.targets.value > 0 || (task.targets as any).duration > 0);
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
@@ -59,7 +57,7 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
       onDragStart={handleDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      onContextMenu={(e) => e.preventDefault()} // Prevent native context menu on long press
+      onContextMenu={(e) => e.preventDefault()}
       className={cn(
         "relative group flex items-center justify-between px-3 py-3 rounded-xl transition-all duration-200 cursor-pointer select-none border border-black/5",
         selected ? "ring-2 ring-offset-1 ring-primary shadow-lg scale-[1.02]" : "hover:scale-[1.01] hover:shadow-md",
@@ -70,7 +68,7 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
     >
       <div className="flex items-center gap-2 overflow-hidden flex-1">
         <span 
-            className="font-bold text-[13px] sm:text-[14px] truncate leading-tight tracking-wide"
+            className="font-medium text-[13px] sm:text-[14px] truncate leading-tight tracking-wide"
             style={{ color: textColor }}
         >
           {task.name}
@@ -94,7 +92,6 @@ export const TaskBlock: React.FC<TaskBlockProps> = ({
         )}
       </div>
       
-      {/* Selection Indicator Dot */}
       {selected && (
         <div className="absolute -right-1 -top-1 w-3 h-3 bg-primary rounded-full border-2 border-white shadow-sm" />
       )}

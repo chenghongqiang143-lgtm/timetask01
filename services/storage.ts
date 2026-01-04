@@ -1,14 +1,22 @@
 
-import { AppState, Task, RatingItem, ShopItem } from '../types';
+import { AppState, Task, RatingItem, ShopItem, Objective } from '../types';
+import { generateId } from '../utils';
 
 const STORAGE_KEY = 'chronos_flow_data_v1';
 
+export const DEFAULT_OBJECTIVES: Objective[] = [
+  { id: 'obj_life', title: '生活平衡', description: '保持身心愉悦与基础生存需求', color: '#94a3b8' },
+  { id: 'obj_work', title: '职业发展', description: '提升专业技能与工作产出', color: '#3b82f6' },
+  { id: 'obj_health', title: '强健体魄', description: '规律运动与健康饮食', color: '#10b981' },
+  { id: 'obj_growth', title: '个人成长', description: '终身学习与认知升级', color: '#8b5cf6' },
+];
+
 export const DEFAULT_TASKS: Task[] = [
-  { id: 't1', name: '睡眠', color: '#94a3b8', category: '生活' },
-  { id: 't2', name: '工作', color: '#3b82f6', category: '工作' },
-  { id: 't3', name: '运动', color: '#10b981', category: '健康' },
-  { id: 't4', name: '阅读', color: '#8b5cf6', category: '成长' },
-  { id: 't5', name: '用餐', color: '#f59e0b', category: '生活' },
+  { id: 't1', name: '睡眠', color: '#94a3b8', category: 'obj_life' },
+  { id: 't2', name: '工作', color: '#3b82f6', category: 'obj_work' },
+  { id: 't3', name: '运动', color: '#10b981', category: 'obj_health' },
+  { id: 't4', name: '阅读', color: '#8b5cf6', category: 'obj_growth' },
+  { id: 't5', name: '用餐', color: '#f59e0b', category: 'obj_life' },
 ];
 
 export const DEFAULT_RATING_ITEMS: RatingItem[] = [
@@ -44,62 +52,52 @@ export const DEFAULT_SHOP_ITEMS: ShopItem[] = [
   { id: 's5', name: '懒惰一天', cost: 100, icon: '🛌' },
 ];
 
+export const getInitialState = (): AppState => ({
+  objectives: DEFAULT_OBJECTIVES,
+  tasks: DEFAULT_TASKS,
+  todos: [],
+  categoryOrder: DEFAULT_OBJECTIVES.map(o => o.id),
+  ratingItems: DEFAULT_RATING_ITEMS,
+  shopItems: DEFAULT_SHOP_ITEMS,
+  redemptions: [],
+  schedule: {},
+  recurringSchedule: {},
+  records: {},
+  ratings: {},
+});
+
 export const loadState = (): AppState => {
   try {
     const serialized = localStorage.getItem(STORAGE_KEY);
     if (!serialized) {
-      return {
-        tasks: DEFAULT_TASKS,
-        categoryOrder: ['生活', '工作', '健康', '成长'],
-        ratingItems: DEFAULT_RATING_ITEMS,
-        shopItems: DEFAULT_SHOP_ITEMS,
-        redemptions: [],
-        schedule: {},
-        recurringSchedule: {},
-        records: {},
-        ratings: {},
-      };
+      return getInitialState();
     }
     const parsed = JSON.parse(serialized);
-    // Data migrations
+    
+    // 基础检查：如果核心内容为空，填充预设
+    if (!parsed.objectives || parsed.objectives.length === 0) {
+      parsed.objectives = DEFAULT_OBJECTIVES;
+    }
+    if (!parsed.tasks || parsed.tasks.length === 0) {
+      parsed.tasks = DEFAULT_TASKS;
+    }
+    if (!parsed.categoryOrder || parsed.categoryOrder.length === 0) {
+      parsed.categoryOrder = parsed.objectives.map((o: Objective) => o.id);
+    }
+
+    if (!parsed.todos) parsed.todos = [];
     if (!parsed.recurringSchedule) parsed.recurringSchedule = {};
     if (!parsed.ratingItems) parsed.ratingItems = DEFAULT_RATING_ITEMS;
     if (!parsed.ratings) parsed.ratings = {};
     if (!parsed.shopItems) parsed.shopItems = DEFAULT_SHOP_ITEMS;
     if (!parsed.redemptions) parsed.redemptions = [];
-    
-    // categoryOrder migration
-    if (!parsed.categoryOrder) {
-      const cats = Array.from(new Set(parsed.tasks.map((t: Task) => t.category || '未分类'))) as string[];
-      parsed.categoryOrder = cats;
-    }
+    if (!parsed.schedule) parsed.schedule = {};
+    if (!parsed.records) parsed.records = {};
 
-    // Ensure all ratings have the new structure
-    Object.keys(parsed.ratings).forEach(date => {
-        if (typeof parsed.ratings[date].score === 'number') {
-            const oldScore = parsed.ratings[date].score;
-            parsed.ratings[date] = {
-                scores: { 'r1': oldScore - 3 }, // Map 1-5 to -2 to 2
-                comment: parsed.ratings[date].comment || ''
-            };
-        }
-        if (!parsed.ratings[date].scores) parsed.ratings[date].scores = {};
-    });
-
-    return parsed;
+    return parsed as AppState;
   } catch (e) {
     console.error("Failed to load state", e);
-    return {
-      tasks: DEFAULT_TASKS,
-      categoryOrder: ['生活', '工作', '健康', '成长'],
-      ratingItems: DEFAULT_RATING_ITEMS,
-      shopItems: DEFAULT_SHOP_ITEMS,
-      redemptions: [],
-      schedule: {},
-      recurringSchedule: {},
-      records: {},
-      ratings: {},
-    };
+    return getInitialState();
   }
 };
 

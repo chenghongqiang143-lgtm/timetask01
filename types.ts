@@ -3,31 +3,57 @@ export type TargetMode = 'duration' | 'count';
 
 export interface TaskTarget {
   mode: TargetMode;
-  value: number; // Represents hours (if mode is duration) or count (if mode is count)
-  frequency: number; // every X days (1 = daily, 7 = weekly, etc.)
+  value: number; // 代表小时或次数
+  frequency: number; // 周期（天）
+}
+
+export interface Objective {
+  id: string;
+  title: string;
+  description?: string;
+  color: string;
 }
 
 export interface Task {
   id: string;
   name: string;
   color: string;
-  category: string; // e.g., "Work", "Life", "Study"
+  category: string; // Task Pool Category (ID)
   targets?: TaskTarget;
 }
 
+// --- 待办系统相关类型 ---
+export interface SubTask {
+  id: string;
+  title: string;
+  isCompleted: boolean;
+}
+
+export interface Todo {
+  id: string;
+  title: string;
+  objectiveId: string;
+  isFrog: boolean; 
+  isCompleted: boolean;
+  subTasks: SubTask[];
+  createdAt: string;
+  completedAt?: string; // yyyy-MM-dd
+  startDate?: string; // yyyy-MM-dd
+  dueTime?: string; // HH:mm
+}
+
 export interface DayData {
-  // Key is hour (0-23), Value is array of task IDs
   hours: Record<number, string[]>;
 }
 
 export interface RatingItem {
   id: string;
   name: string;
-  reasons: Record<number, string>; // Map of score (-2 to 2) to label
+  reasons: Record<number, string>;
 }
 
 export interface DayRating {
-  scores: Record<string, number>; // ratingItemId -> selected score
+  scores: Record<string, number>;
   comment: string;
 }
 
@@ -43,25 +69,23 @@ export interface Redemption {
   shopItemId: string;
   itemName: string;
   cost: number;
-  date: string; // ISO string
+  date: string;
 }
 
-export type Tab = 'tracker' | 'stats' | 'rating' | 'settings';
+export type Tab = 'todo' | 'stats' | 'record' | 'settings';
 
 export interface AppState {
+  objectives: Objective[];
   tasks: Task[];
+  todos: Todo[];
   categoryOrder: string[];
   ratingItems: RatingItem[];
   shopItems: ShopItem[];
   redemptions: Redemption[];
-  schedule: Record<string, DayData>; // Key is YYYY-MM-DD
-  recurringSchedule: Record<number, string[]>; // Key is hour (0-23), Value is task IDs that repeat daily
-  records: Record<string, DayData>; // Key is YYYY-MM-DD
-  ratings: Record<string, DayRating>; // Key is YYYY-MM-DD
-}
-
-export interface DragItem {
-  taskId: string;
+  schedule: Record<string, DayData>;
+  recurringSchedule: Record<number, string[]>;
+  records: Record<string, DayData>;
+  ratings: Record<string, DayRating>;
 }
 
 export const HOURS = Array.from({ length: 24 }, (_, i) => i);

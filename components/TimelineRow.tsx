@@ -30,21 +30,27 @@ export const TimelineRow: React.FC<TimelineRowProps> = ({
 
   const formatHour = (h: number) => `${h.toString().padStart(2, '0')}:00`;
 
-  const renderTasks = (tasks: Task[]) => {
-    if (tasks.length === 0) return null;
+  const renderTasks = (tasks: Task[], type: 'plan' | 'actual') => {
+    if (tasks.length === 0) return (
+        <div className={cn(
+            "w-full h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity",
+            type === 'plan' ? "bg-indigo-50/10" : "bg-emerald-50/10"
+        )}>
+            <div className="w-0.5 h-0.5 rounded-full bg-stone-200" />
+        </div>
+    );
     return (
-      <div className="flex gap-0.5 w-full h-full overflow-hidden">
+      <div className="flex gap-0.5 w-full h-full overflow-hidden p-0.5">
         {tasks.map((task, idx) => (
           <div
             key={`${task.id}-${idx}`}
-            className="flex-1 h-full rounded-md flex items-center justify-center text-[11px] font-normal tracking-tight truncate px-1 leading-none transition-all animate-in fade-in slide-in-from-bottom-1 duration-500 border border-black/5"
+            className="flex-1 h-full rounded-[3px] flex items-center justify-center text-[10px] font-medium truncate px-1 leading-none transition-all border border-black/5"
             style={{ 
               backgroundColor: task.color, 
-              color: getContrastColor(task.color),
-              textShadow: '0 0 1px rgba(0,0,0,0.05)'
+              color: getContrastColor(task.color)
             }}
           >
-            {tasks.length <= 3 ? task.name : ''}
+            {tasks.length <= 2 ? task.name : ''}
           </div>
         ))}
       </div>
@@ -55,38 +61,36 @@ export const TimelineRow: React.FC<TimelineRowProps> = ({
   const isRecordActive = activeSlot?.hour === hour && activeSlot?.type === 'record';
 
   return (
-    <div className="flex h-11 border-b border-stone-50 group transition-colors">
+    <div className="flex h-9 border-b border-stone-50 group transition-colors">
       <div 
         className={cn(
-          "flex-1 flex p-1 cursor-pointer transition-all duration-300",
-          isScheduleActive 
-            ? "bg-indigo-50 border border-indigo-200" 
-            : "hover:bg-indigo-50/50"
+          "flex-1 flex transition-all duration-300 relative overflow-hidden",
+          isScheduleActive ? "bg-indigo-50" : "hover:bg-stone-50/50"
         )}
         onClick={() => onScheduleClick(hour)}
       >
-        {renderTasks(scheduleTasks)}
+        {renderTasks(scheduleTasks, 'plan')}
+        {scheduleTasks.length > 0 && <div className="absolute right-0 top-0 bottom-0 w-[2px] bg-indigo-200/30" />}
       </div>
 
       <div className={cn(
-        "w-14 flex-shrink-0 flex items-center justify-center text-[10px] font-mono transition-all duration-300 select-none z-10 border-x border-stone-50",
+        "w-12 flex-shrink-0 flex items-center justify-center text-[9px] font-mono transition-all duration-300 select-none z-10 border-x border-stone-100 bg-white",
         (isScheduleActive || isRecordActive) 
-            ? "bg-stone-900 text-white font-bold scale-110 rounded-sm" 
-            : "text-stone-300 group-hover:text-stone-500 group-hover:bg-stone-50 bg-white"
+            ? "text-stone-900 font-medium scale-105" 
+            : "text-stone-300 group-hover:text-stone-400"
       )}>
         {formatHour(hour)}
       </div>
 
       <div 
         className={cn(
-          "flex-1 flex p-1 cursor-pointer transition-all duration-300",
-          isRecordActive 
-            ? "bg-emerald-50 border border-emerald-200" 
-            : "hover:bg-emerald-50/50"
+          "flex-1 flex transition-all duration-300 relative overflow-hidden",
+          isRecordActive ? "bg-emerald-50" : "hover:bg-stone-50/50"
         )}
         onClick={() => onRecordClick(hour)}
       >
-        {renderTasks(recordTasks)}
+        {renderTasks(recordTasks, 'actual')}
+        {recordTasks.length > 0 && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-emerald-200/30" />}
       </div>
     </div>
   );
