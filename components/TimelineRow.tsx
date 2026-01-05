@@ -10,7 +10,8 @@ interface TimelineRowProps {
   allTasks: Task[];
   onScheduleClick: (hour: number) => void;
   onRecordClick: (hour: number) => void;
-  activeSlot?: { hour: number; type: 'schedule' | 'record' } | null;
+  isScheduleSelected?: boolean;
+  isRecordSelected?: boolean;
 }
 
 export const TimelineRow: React.FC<TimelineRowProps> = ({
@@ -20,7 +21,8 @@ export const TimelineRow: React.FC<TimelineRowProps> = ({
   allTasks,
   onScheduleClick,
   onRecordClick,
-  activeSlot
+  isScheduleSelected,
+  isRecordSelected
 }) => {
   const getTasksFromIds = (ids: string[]) => 
     ids.map(id => allTasks.find(t => t.id === id)).filter((t): t is Task => !!t);
@@ -31,12 +33,17 @@ export const TimelineRow: React.FC<TimelineRowProps> = ({
   const formatHour = (h: number) => `${h.toString().padStart(2, '0')}:00`;
 
   const renderTasks = (tasks: Task[], type: 'plan' | 'actual') => {
+    const isSelected = (type === 'plan' && isScheduleSelected) || (type === 'actual' && isRecordSelected);
+    
     if (tasks.length === 0) return (
         <div className={cn(
-            "w-full h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity",
-            type === 'plan' ? "bg-indigo-50/10" : "bg-emerald-50/10"
+            "w-full h-full flex items-center justify-center transition-all duration-300",
+            isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
         )}>
-            <div className="w-0.5 h-0.5 rounded-full bg-stone-200" />
+            <div className={cn(
+                "w-1 h-1 rounded-full transition-colors",
+                isSelected ? "bg-stone-300" : "bg-stone-200"
+            )} />
         </div>
     );
     return (
@@ -44,28 +51,28 @@ export const TimelineRow: React.FC<TimelineRowProps> = ({
         {tasks.map((task, idx) => (
           <div
             key={`${task.id}-${idx}`}
-            className="flex-1 h-full rounded-[3px] flex items-center justify-center text-[10px] font-medium truncate px-1 leading-none transition-all border border-black/5"
+            className={cn(
+                "flex-1 h-full rounded-[3px] flex items-center justify-center font-medium truncate leading-none transition-all border border-black/5",
+                tasks.length > 3 ? "px-0 text-[9px]" : "px-1 text-[10px]"
+            )}
             style={{ 
               backgroundColor: task.color, 
               color: getContrastColor(task.color)
             }}
           >
-            {tasks.length <= 2 ? task.name : ''}
+            {tasks.length <= 3 ? task.name : task.name.slice(0, 1)}
           </div>
         ))}
       </div>
     );
   };
 
-  const isScheduleActive = activeSlot?.hour === hour && activeSlot?.type === 'schedule';
-  const isRecordActive = activeSlot?.hour === hour && activeSlot?.type === 'record';
-
   return (
     <div className="flex h-9 border-b border-stone-50 group transition-colors">
       <div 
         className={cn(
-          "flex-1 flex transition-all duration-300 relative overflow-hidden",
-          isScheduleActive ? "bg-indigo-50" : "hover:bg-stone-50/50"
+          "flex-1 flex transition-all duration-200 relative overflow-hidden",
+          isScheduleSelected ? "bg-indigo-100 shadow-[inset_0_0_10px_rgba(99,102,241,0.15)]" : "hover:bg-stone-50/50"
         )}
         onClick={() => onScheduleClick(hour)}
       >
@@ -75,8 +82,8 @@ export const TimelineRow: React.FC<TimelineRowProps> = ({
 
       <div className={cn(
         "w-12 flex-shrink-0 flex items-center justify-center text-[9px] font-mono transition-all duration-300 select-none z-10 border-x border-stone-100 bg-white",
-        (isScheduleActive || isRecordActive) 
-            ? "text-stone-900 font-medium scale-105" 
+        (isScheduleSelected || isRecordSelected) 
+            ? "text-stone-900 font-bold scale-110 bg-stone-50" 
             : "text-stone-300 group-hover:text-stone-400"
       )}>
         {formatHour(hour)}
@@ -84,8 +91,8 @@ export const TimelineRow: React.FC<TimelineRowProps> = ({
 
       <div 
         className={cn(
-          "flex-1 flex transition-all duration-300 relative overflow-hidden",
-          isRecordActive ? "bg-emerald-50" : "hover:bg-stone-50/50"
+          "flex-1 flex transition-all duration-200 relative overflow-hidden",
+          isRecordSelected ? "bg-emerald-100 shadow-[inset_0_0_10px_rgba(16,185,129,0.15)]" : "hover:bg-stone-50/50"
         )}
         onClick={() => onRecordClick(hour)}
       >

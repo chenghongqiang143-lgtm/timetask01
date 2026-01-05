@@ -4,7 +4,7 @@ import { Task, DayData, HOURS, Objective, Todo } from '../types';
 import { TimelineRow } from '../components/TimelineRow';
 import { TaskEditorModal } from '../components/TaskEditorModal';
 import { cn, formatDate, generateId } from '../utils';
-import { Clock, LayoutGrid, Check, X, ChevronLeft, ChevronRight, Repeat } from 'lucide-react';
+import { Clock, LayoutGrid, Check, X, ChevronLeft, ChevronRight, Repeat, CheckCircle2 } from 'lucide-react';
 
 interface TrackerViewProps {
   tasks: Task[];
@@ -40,7 +40,10 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   currentDate,
   onEditingStatusChange
 }) => {
-  const [activeSlot, setActiveSlot] = useState<{ hour: number, side: 'plan' | 'actual' } | null>(null);
+  // 从 activeSlot 重构为多选状态
+  const [activeSide, setActiveSide] = useState<'plan' | 'actual' | null>(null);
+  const [selectedHours, setSelectedHours] = useState<Set<number>>(new Set<number>());
+  
   const [isRecurringMode, setIsRecurringMode] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -53,13 +56,17 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   // 同步状态到父组件
   useEffect(() => {
     if (onEditingStatusChange) {
-      if (activeSlot) {
-        onEditingStatusChange(`${activeSlot.hour}:00 ${activeSlot.side === 'plan' ? '安排' : '记录'}`);
+      if (activeSide && selectedHours.size > 0) {
+        const sortedHours = Array.from(selectedHours).sort((a: number, b: number) => a - b);
+        const hoursText = sortedHours.length > 3 
+            ? `${sortedHours.length}个时段` 
+            : sortedHours.map(h => `${h}:00`).join(', ');
+        onEditingStatusChange(`${hoursText} ${activeSide === 'plan' ? '安排' : '记录'}`);
       } else {
         onEditingStatusChange(null);
       }
     }
-  }, [activeSlot, onEditingStatusChange]);
+  }, [activeSide, selectedHours, onEditingStatusChange]);
 
   const taskProgress = useMemo(() => {
     const stats: Record<string, number> = {};
@@ -68,12 +75,13 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
     HOURS.forEach(h => {
       const ids = recordData.hours[h] || [];
       ids.forEach(tid => {
-        if (stats[tid] !== undefined) {
+        const currentVal = stats[tid];
+        if (typeof currentVal === 'number') {
           const task = tasks.find(t => t.id === tid);
           if (task?.targets?.mode === 'count') {
-            stats[tid] += 1;
+            stats[tid] = currentVal + 1;
           } else {
-            stats[tid] += (1 / Math.max(ids.length, 1));
+            stats[tid] = currentVal + (1 / Math.max(ids.length, 1));
           }
         }
       });
@@ -95,58 +103,93 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
   };
 
   const handleHourClick = (hour: number, side: 'plan' | 'actual') => {
-    setActiveSlot(prev => (prev?.hour === hour && prev?.side === side) ? null : { hour, side });
-  };
-
-  const handleToggleTaskInSlot = (taskId: string) => {
-    if (!activeSlot) return;
-
-    const { hour, side } = activeSlot;
-
-    if (side === 'actual') {
-        const current = recordData.hours[hour] || [];
-        const isIncluded = current.includes(taskId);
-        if (isIncluded) {
-            onUpdateRecord(hour, current.filter(id => id !== taskId));
-        } else {
-            onUpdateRecord(hour, [...current, taskId].slice(-4));
-        }
+    if (activeSide !== side) {
+        // 切换侧边或首次选择：清空并选中当前
+        setActiveSide(side);
+        setSelectedHours(new Set([hour]));
     } else {
-        if (isRecurringMode) {
-            const current = recurringSchedule[hour] || [];
-            const isIncluded = current.includes(taskId);
-            if (isIncluded) {
-                onUpdateRecurring(hour, current.filter(id => id !== taskId));
-            } else {
-                onUpdateRecurring(hour, [...current, taskId].slice(-4));
+        // 同侧：切换选择状态
+        const newSelection = new Set(selectedHours);
+        if (newSelection.has(hour)) {
+            newSelection.delete(hour);
+            if (newSelection.size === 0) {
+                setActiveSide(null);
             }
         } else {
-            const current = scheduleData.hours[hour] || [];
-            const isIncluded = current.includes(taskId);
-            if (isIncluded) {
-                onUpdateSchedule(hour, current.filter(id => id !== taskId));
-            } else {
-                onUpdateSchedule(hour, [...current, taskId].slice(-4));
-            }
+            newSelection.add(hour);
         }
+        setSelectedHours(newSelection);
     }
   };
 
+  // 支持批量操作
+  const handleToggleTaskInSlot = (taskId: string) => {
+    if (!activeSide || selectedHours.size === 0) return;
+
+    // 确定当前操作的数据源和更新函数
+    const isRecurring = activeSide === 'plan' && isRecurringMode;
+    const targetDataMap = activeSide === 'actual' 
+        ? recordData.hours 
+        : (isRecurring ? recurringSchedule : scheduleData.hours);
+    const updateFn = activeSide === 'actual' 
+        ? onUpdateRecord 
+        : (isRecurring ? onUpdateRecurring : onUpdateSchedule);
+
+    // 检查是否所有选中的小时都包含该任务
+    const allHaveIt = Array.from(selectedHours).every((h: number) => (targetDataMap[h] || []).includes(taskId));
+
+    selectedHours.forEach(hour => {
+        const currentTasks = targetDataMap[hour] || [];
+        let newTasks;
+
+        if (allHaveIt) {
+            // 如果所有选中的时间段都有这个任务，则全部移除
+            newTasks = currentTasks.filter(id => id !== taskId);
+        } else {
+            // 否则，添加到没有该任务的时间段（保留已有，不超过4个）
+            if (!currentTasks.includes(taskId)) {
+                newTasks = [...currentTasks, taskId].slice(-4);
+            } else {
+                newTasks = currentTasks;
+            }
+        }
+
+        // 只有当数据变化时才调用更新
+        if (newTasks !== currentTasks) {
+            updateFn(hour, newTasks);
+        }
+    });
+  };
+
+  // 只要所有选中时间段中都包含该任务，就认为“选中”了该任务（用于高亮显示）
   const isTaskInActiveSlot = (taskId: string) => {
-      if (!activeSlot) return false;
-      const { hour, side } = activeSlot;
-      if (side === 'actual') return (recordData.hours[hour] || []).includes(taskId);
-      if (isRecurringMode) return (recurringSchedule[hour] || []).includes(taskId);
-      return (scheduleData.hours[hour] || []).includes(taskId);
+      if (!activeSide || selectedHours.size === 0) return false;
+      const isRecurring = activeSide === 'plan' && isRecurringMode;
+      const targetDataMap = activeSide === 'actual' 
+          ? recordData.hours 
+          : (isRecurring ? recurringSchedule : scheduleData.hours);
+      
+      // 只要所有选中时段都包含该任务，返回 true
+      return Array.from(selectedHours).every((h: number) => (targetDataMap[h] || []).includes(taskId));
+  };
+
+  const clearSelection = () => {
+      setSelectedHours(new Set());
+      setActiveSide(null);
   };
 
   const PoolContent = () => (
     <div className="flex flex-col h-full bg-white">
         <div className="px-4 py-3 border-b border-stone-100 flex items-center justify-between sticky top-0 bg-white/90 backdrop-blur-md z-10 shrink-0">
-            <h3 className="text-[9px] font-bold text-stone-900 uppercase tracking-widest flex items-center gap-1.5">
-                <LayoutGrid size={10} /> 行为模板库
-            </h3>
-            {activeSlot?.side === 'plan' && (
+            <div className="flex items-center gap-2">
+                <h3 className="text-[9px] font-bold text-stone-900 uppercase tracking-widest flex items-center gap-1.5">
+                    <LayoutGrid size={10} /> 行为模板库
+                </h3>
+                {selectedHours.size > 1 && (
+                     <span className="px-1.5 py-0.5 rounded-md bg-stone-900 text-white text-[8px] font-bold">已选 {selectedHours.size}</span>
+                )}
+            </div>
+            {activeSide === 'plan' && (
                 <button 
                     onClick={() => setIsRecurringMode(!isRecurringMode)}
                     className={cn(
@@ -157,7 +200,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                     <Repeat size={10} /> {isRecurringMode ? '已开启循环' : '循环'}
                 </button>
             )}
-            <button onClick={() => setActiveSlot(null)} className="p-1 hover:bg-stone-100 rounded-full text-stone-300 transition-colors">
+            <button onClick={clearSelection} className="p-1 hover:bg-stone-100 rounded-full text-stone-300 transition-colors">
                 <X size={14} />
             </button>
         </div>
@@ -232,7 +275,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       {/* 记录页 (Actual Side) 激活时从左侧弹出 */}
       <aside className={cn(
         "absolute left-0 top-0 bottom-0 w-[240px] bg-white border-r border-stone-200 z-[70] transition-transform duration-500 ease-out shadow-[10px_0_40px_rgba(0,0,0,0.08)]",
-        activeSlot?.side === 'actual' ? "translate-x-0" : "-translate-x-full"
+        activeSide === 'actual' ? "translate-x-0" : "-translate-x-full"
       )}>
         <PoolContent />
       </aside>
@@ -240,7 +283,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
       {/* 安排页 (Plan Side) 激活时从右侧弹出 */}
       <aside className={cn(
         "absolute right-0 top-0 bottom-0 w-[240px] bg-white border-l border-stone-200 z-[70] transition-transform duration-500 ease-out shadow-[-10px_0_40px_rgba(0,0,0,0.08)]",
-        activeSlot?.side === 'plan' ? "translate-x-0" : "translate-x-full"
+        activeSide === 'plan' ? "translate-x-0" : "translate-x-full"
       )}>
         <PoolContent />
       </aside>
@@ -272,7 +315,8 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
               allTasks={tasks} 
               onScheduleClick={(h) => handleHourClick(h, 'plan')}
               onRecordClick={(h) => handleHourClick(h, 'actual')}
-              activeSlot={activeSlot ? { hour: activeSlot.hour, type: activeSlot.side === 'plan' ? 'schedule' : 'record' } : null}
+              isScheduleSelected={activeSide === 'plan' && selectedHours.has(hour)}
+              isRecordSelected={activeSide === 'actual' && selectedHours.has(hour)}
             />
           ))}
         </div>

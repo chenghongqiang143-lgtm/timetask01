@@ -33,6 +33,7 @@ export interface Todo {
   id: string;
   title: string;
   objectiveId: string;
+  templateId?: string; // 关联的任务模板ID
   isFrog: boolean; 
   isCompleted: boolean;
   subTasks: SubTask[];
@@ -74,6 +75,11 @@ export interface Redemption {
 
 export type Tab = 'todo' | 'stats' | 'record' | 'settings';
 
+export interface RolloverSettings {
+  enabled: boolean;
+  maxDays: number;
+}
+
 export interface AppState {
   objectives: Objective[];
   tasks: Task[];
@@ -86,6 +92,7 @@ export interface AppState {
   recurringSchedule: Record<number, string[]>;
   records: Record<string, DayData>;
   ratings: Record<string, DayRating>;
+  rolloverSettings: RolloverSettings;
 }
 
 export const HOURS = Array.from({ length: 24 }, (_, i) => i);

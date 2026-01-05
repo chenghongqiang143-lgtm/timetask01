@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Todo, Objective, SubTask } from '../types';
 import { X, Save, Plus, Trash2, CheckSquare, ListTodo, Calendar } from 'lucide-react';
-import { cn, generateId } from '../utils';
+import { cn, generateId, formatDate } from '../utils';
 
 interface TodoEditorModalProps {
   todo: Todo | null;
@@ -12,6 +12,7 @@ interface TodoEditorModalProps {
   onSave: (todo: Todo) => void;
   onDelete?: (id: string) => void;
   frogCount: number;
+  defaultDate?: Date;
 }
 
 export const TodoEditorModal: React.FC<TodoEditorModalProps> = ({
@@ -21,7 +22,8 @@ export const TodoEditorModal: React.FC<TodoEditorModalProps> = ({
   onClose,
   onSave,
   onDelete,
-  frogCount
+  frogCount,
+  defaultDate = new Date()
 }) => {
   const [title, setTitle] = useState('');
   const [objectiveId, setObjectiveId] = useState('none');
@@ -42,11 +44,12 @@ export const TodoEditorModal: React.FC<TodoEditorModalProps> = ({
         setTitle('');
         setObjectiveId('none');
         setIsFrog(false);
-        setStartDate('');
+        // 锁定预设内容为传入的 defaultDate (当前选中的日期)
+        setStartDate(formatDate(defaultDate));
         setSubTasks([]);
       }
     }
-  }, [isOpen, todo, objectives]);
+  }, [isOpen, todo, objectives, defaultDate]);
 
   if (!isOpen) return null;
 
@@ -206,7 +209,12 @@ export const TodoEditorModal: React.FC<TodoEditorModalProps> = ({
           {todo && onDelete && (
             <button 
               type="button" 
-              onClick={() => onDelete(todo.id)}
+              onClick={(e) => { 
+                  e.preventDefault(); 
+                  e.stopPropagation(); 
+                  onDelete(todo.id); 
+                  onClose(); 
+              }}
               className="p-3 rounded-lg bg-white border border-rose-100 text-rose-500 hover:bg-rose-50 transition-colors"
             >
               <Trash2 size={18} />

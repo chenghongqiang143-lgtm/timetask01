@@ -64,6 +64,7 @@ export const getInitialState = (): AppState => ({
   recurringSchedule: {},
   records: {},
   ratings: {},
+  rolloverSettings: { enabled: false, maxDays: 3 },
 });
 
 export const loadState = (): AppState => {
@@ -74,16 +75,12 @@ export const loadState = (): AppState => {
     }
     const parsed = JSON.parse(serialized);
     
-    // 基础检查：如果核心内容为空，填充预设
-    if (!parsed.objectives || parsed.objectives.length === 0) {
-      parsed.objectives = DEFAULT_OBJECTIVES;
-    }
-    if (!parsed.tasks || parsed.tasks.length === 0) {
-      parsed.tasks = DEFAULT_TASKS;
-    }
-    if (!parsed.categoryOrder || parsed.categoryOrder.length === 0) {
-      parsed.categoryOrder = parsed.objectives.map((o: Objective) => o.id);
-    }
+    // Safety check for critical arrays
+    if (!parsed || typeof parsed !== 'object') return getInitialState();
+    
+    if (!parsed.objectives || !Array.isArray(parsed.objectives)) parsed.objectives = DEFAULT_OBJECTIVES;
+    if (!parsed.tasks || !Array.isArray(parsed.tasks)) parsed.tasks = DEFAULT_TASKS;
+    if (!parsed.categoryOrder) parsed.categoryOrder = parsed.objectives.map((o: Objective) => o.id);
 
     if (!parsed.todos) parsed.todos = [];
     if (!parsed.recurringSchedule) parsed.recurringSchedule = {};
@@ -93,6 +90,7 @@ export const loadState = (): AppState => {
     if (!parsed.redemptions) parsed.redemptions = [];
     if (!parsed.schedule) parsed.schedule = {};
     if (!parsed.records) parsed.records = {};
+    if (!parsed.rolloverSettings) parsed.rolloverSettings = { enabled: false, maxDays: 3 };
 
     return parsed as AppState;
   } catch (e) {

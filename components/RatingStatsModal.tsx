@@ -55,7 +55,6 @@ export const RatingStatsModal: React.FC<RatingStatsModalProps> = ({
       const key = formatDate(day);
       const rating = ratings[key];
       if (rating && rating.scores) {
-        // Fix: Explicitly type reduce as returning a number and cast current value b to number to resolve 'unknown' type errors
         const daySum = Object.values(rating.scores).reduce<number>((a, b) => a + (b as number), 0);
         total += daySum;
         count++;
@@ -138,7 +137,7 @@ export const RatingStatsModal: React.FC<RatingStatsModalProps> = ({
           <div className="space-y-4">
             <div className="flex items-center gap-2 px-1">
               <Calendar size={14} className="text-stone-300" />
-              <h4 className="text-[10px] font-black text-stone-400 uppercase tracking-widest">维度热力 analysis</h4>
+              <h4 className="text-[10px] font-black text-stone-400 uppercase tracking-widest">维度热力分析</h4>
             </div>
 
             <div className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm overflow-x-auto no-scrollbar">
@@ -195,26 +194,20 @@ export const RatingStatsModal: React.FC<RatingStatsModalProps> = ({
           </div>
 
           {/* 图例 */}
-          <div className="flex items-center justify-center gap-6 pt-4">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-emerald-600" />
-              <span className="text-[9px] font-black text-stone-400">+2 极佳</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-emerald-400" />
-              <span className="text-[9px] font-black text-stone-400">+1 较好</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-stone-200" />
-              <span className="text-[9px] font-black text-stone-400">0 一般</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-rose-400" />
-              <span className="text-[9px] font-black text-stone-400">-1 略差</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-rose-600" />
-              <span className="text-[9px] font-black text-stone-400">-2 极差</span>
+          <div className="mt-4 pt-4 border-t border-stone-100">
+            <div className="flex flex-wrap justify-center gap-3">
+              {[
+                { s: 2, label: '极佳', color: 'bg-emerald-600', text: 'text-emerald-700', border: 'border-emerald-200' },
+                { s: 1, label: '较好', color: 'bg-emerald-400', text: 'text-emerald-600', border: 'border-emerald-100' },
+                { s: 0, label: '一般', color: 'bg-stone-300', text: 'text-stone-500', border: 'border-stone-200' },
+                { s: -1, label: '略差', color: 'bg-rose-400', text: 'text-rose-500', border: 'border-rose-100' },
+                { s: -2, label: '极差', color: 'bg-rose-600', text: 'text-rose-700', border: 'border-rose-200' },
+              ].map(item => (
+                <div key={item.s} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border shadow-sm", item.border)}>
+                  <div className={cn("w-2 h-2 rounded-full", item.color)} />
+                  <span className={cn("text-[10px] font-bold", item.text)}>{item.s > 0 ? `+${item.s}` : item.s} {item.label}</span>
+                </div>
+              ))}
             </div>
           </div>
 

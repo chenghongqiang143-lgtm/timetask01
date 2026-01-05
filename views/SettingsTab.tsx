@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Task, DayData, Objective, HOURS } from '../types';
+import { Task, DayData, Objective, HOURS, RolloverSettings } from '../types';
 import { TaskEditorModal } from '../components/TaskEditorModal';
 import { ObjectiveEditorModal } from '../components/ObjectiveEditorModal';
-import { Plus, ArrowUp, ArrowDown, Edit2, Check, Download, Upload, Trash2, Database, X, AlertCircle } from 'lucide-react';
+import { Plus, ArrowUp, ArrowDown, Edit2, Check, Download, Upload, Trash2, Database, X, AlertCircle, CalendarClock, Target } from 'lucide-react';
 import { cn, formatDate } from '../utils';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
@@ -27,6 +27,8 @@ interface SettingsTabProps {
   onAddObjective?: (obj: Objective) => void;
   onUpdateObjective?: (obj: Objective) => void;
   onDeleteObjective?: (id: string) => void;
+  rolloverSettings: RolloverSettings;
+  onUpdateRolloverSettings: (settings: RolloverSettings) => void;
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
@@ -44,7 +46,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   currentDate,
   onExportData,
   onImportData,
-  onClearData
+  onClearData,
+  rolloverSettings,
+  onUpdateRolloverSettings
 }) => {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isObjModalOpen, setIsObjModalOpen] = useState(false);
@@ -100,20 +104,74 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
     }
   };
 
-  const blockClass = "bg-white h-11 px-4 rounded-xl border border-stone-100 flex items-center justify-between group hover:border-stone-200 transition-all cursor-pointer shadow-sm active:scale-[0.98] relative overflow-hidden";
-  const titleClass = "font-bold text-stone-800 text-[12px] truncate leading-none";
+  const blockClass = "bg-white h-12 px-4 rounded-xl border border-stone-100 flex items-center justify-between group hover:border-stone-200 transition-all cursor-pointer shadow-sm active:scale-[0.98] relative overflow-hidden";
+  const titleClass = "font-black text-stone-800 text-[11px] truncate leading-none";
 
   return (
     <div className="h-full bg-stone-50 overflow-y-auto custom-scrollbar relative">
-      <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-12 pb-32">
+      <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-10 pb-32">
         
-        <section className="space-y-5">
+        {/* 系统规则设置区域 */}
+        <section className="space-y-4">
+           <div className="flex flex-col gap-0.5 px-1">
+              <h3 className="text-[10px] font-black text-stone-400 uppercase tracking-widest leading-none">系统规则</h3>
+              <p className="text-sm font-black text-stone-800 tracking-tight">自动化行为与偏好</p>
+           </div>
+
+           <div className="bg-white rounded-2xl border border-stone-100 p-5 shadow-sm space-y-5">
+              <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                      <div className={cn("p-2.5 rounded-xl transition-colors", rolloverSettings.enabled ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-400")}>
+                          <CalendarClock size={18} />
+                      </div>
+                      <div>
+                          <h4 className="font-black text-stone-800 text-[13px]">待办自动顺延</h4>
+                          <p className="text-[10px] font-medium text-stone-400">未完成任务自动移动到下一天</p>
+                      </div>
+                  </div>
+                  <button 
+                      onClick={() => onUpdateRolloverSettings({ ...rolloverSettings, enabled: !rolloverSettings.enabled })}
+                      className={cn(
+                          "w-10 h-6 rounded-full p-1 transition-colors duration-300 ease-in-out relative",
+                          rolloverSettings.enabled ? "bg-stone-900" : "bg-stone-200"
+                      )}
+                  >
+                      <div className={cn(
+                          "w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300",
+                          rolloverSettings.enabled ? "translate-x-4" : "translate-x-0"
+                      )} />
+                  </button>
+              </div>
+
+              {rolloverSettings.enabled && (
+                  <div className="pt-4 border-t border-stone-50 animate-in fade-in slide-in-from-top-4">
+                      <div className="flex items-center justify-between px-1">
+                          <span className="text-[11px] font-bold text-stone-500">最大顺延天数</span>
+                          <div className="flex items-center gap-3">
+                              <span className="text-[11px] font-black text-stone-900">{rolloverSettings.maxDays} 天</span>
+                              <input 
+                                  type="range" 
+                                  min="1" 
+                                  max="7" 
+                                  step="1"
+                                  value={rolloverSettings.maxDays}
+                                  onChange={(e) => onUpdateRolloverSettings({ ...rolloverSettings, maxDays: parseInt(e.target.value) })}
+                                  className="w-24 h-1.5 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-stone-900"
+                              />
+                          </div>
+                      </div>
+                  </div>
+              )}
+           </div>
+        </section>
+
+        {/* 领域分类管理 */}
+        <section className="space-y-4">
            <div className="flex justify-between items-end px-1">
-             <div>
-                <h3 className="text-[15px] font-bold text-stone-900 tracking-tight">领域分类</h3>
-                <p className="text-[9px] text-stone-400 font-medium uppercase tracking-widest mt-0.5">管理你的核心生活维度</p>
+             <div className="flex flex-col gap-0.5">
+                <h3 className="text-[10px] font-black text-stone-400 uppercase tracking-widest leading-none">分类编辑</h3>
              </div>
-             <button onClick={() => { setEditingObjective(null); setIsObjModalOpen(true); }} className="p-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-all shadow-md">
+             <button onClick={() => { setEditingObjective(null); setIsObjModalOpen(true); }} className="p-2 bg-stone-900 text-white rounded-xl hover:bg-stone-800 transition-all shadow-lg active:scale-90">
                 <Plus size={16} />
              </button>
            </div>
@@ -122,19 +180,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               {sortedObjectives.map((obj, idx) => (
                 <div 
                     key={obj.id} 
-                    className={blockClass}
+                    className={cn(blockClass, "hover:bg-stone-50")}
                     onClick={() => { setEditingObjective(obj); setIsObjModalOpen(true); }}
                 >
-                   <div className="flex items-center gap-2.5 min-w-0 flex-1 relative z-10">
-                      <div className="w-1.5 h-1.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: obj.color }} />
-                      <h4 className={titleClass}>{obj.title}</h4>
+                   <div className="flex items-center gap-3 min-w-0 flex-1 relative z-10">
+                      <div className="w-2 h-2 rounded-full shrink-0 shadow-inner" style={{ backgroundColor: obj.color }} />
+                      <div className="flex flex-col min-w-0">
+                         <h4 className={titleClass}>{obj.title}</h4>
+                      </div>
                    </div>
                    
                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all relative z-10 shrink-0">
-                      <button onClick={(e) => { e.stopPropagation(); moveObjective(idx, 'up'); }} className="p-1 text-stone-300 hover:text-stone-800 hover:bg-stone-50 rounded">
+                      <button onClick={(e) => { e.stopPropagation(); moveObjective(idx, 'up'); }} className="p-1.5 text-stone-300 hover:text-stone-900 transition-colors">
                         <ArrowUp size={12} />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); moveObjective(idx, 'down'); }} className="p-1 text-stone-300 hover:text-stone-800 hover:bg-stone-50 rounded">
+                      <button onClick={(e) => { e.stopPropagation(); moveObjective(idx, 'down'); }} className="p-1.5 text-stone-300 hover:text-stone-900 transition-colors">
                         <ArrowDown size={12} />
                       </button>
                    </div>
@@ -143,25 +203,25 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
            </div>
         </section>
 
-        <section className="space-y-8">
+        {/* 行为模板管理 */}
+        <section className="space-y-4">
            <div className="flex justify-between items-end px-1">
-             <div>
-                <h3 className="text-[15px] font-bold text-stone-900 tracking-tight">行为模板</h3>
-                <p className="text-[9px] text-stone-400 font-medium uppercase tracking-widest mt-0.5">预设模板以便快速记录</p>
+             <div className="flex flex-col gap-0.5">
+                <h3 className="text-[10px] font-black text-stone-400 uppercase tracking-widest leading-none">行为模板管理</h3>
              </div>
-             <button onClick={() => { setEditingTask(null); setIsTaskModalOpen(true); }} className="p-2 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-all shadow-md">
+             <button onClick={() => { setEditingTask(null); setIsTaskModalOpen(true); }} className="p-2 bg-stone-900 text-white rounded-xl hover:bg-stone-800 transition-all shadow-lg active:scale-90">
                 <Plus size={16} />
              </button>
            </div>
 
-           <div className="space-y-10">
+           <div className="space-y-8">
               {sortedObjectives.map(obj => {
                 const filteredTasks = tasks.filter(t => t.category === obj.id);
                 if (filteredTasks.length === 0) return null;
                 return (
                   <div key={obj.id} className="space-y-3">
                     <div className="flex items-center gap-3 px-1">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-stone-300">{obj.title}</span>
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-400">{obj.title}</span>
                         <div className="h-px flex-1 bg-stone-100" />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -176,29 +236,31 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                 <div 
                                     key={task.id} 
                                     onClick={() => { setEditingTask(task); setIsTaskModalOpen(true); }} 
-                                    className={blockClass}
+                                    className={cn(blockClass, "bg-white border-stone-100/60")}
                                 >
                                     <div 
                                         className="absolute left-0 top-0 bottom-0 pointer-events-none transition-all duration-700 ease-out z-0"
                                         style={{ 
                                             width: `${progress}%`, 
-                                            backgroundColor: `${task.color}12`
+                                            backgroundColor: `${task.color}10`
                                         }}
                                     />
 
                                     <div className="flex items-center gap-2 truncate relative z-10 flex-1 min-w-0">
-                                        <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: task.color }} />
+                                        <div className="w-1.5 h-1.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: task.color }} />
                                         <span className={titleClass}>{task.name}</span>
                                     </div>
-                                    <div className="relative z-10 flex items-center gap-1.5 shrink-0 ml-1">
+                                    <div className="relative z-10 flex items-center gap-1 shrink-0 ml-1">
                                         {isCompleted ? (
-                                            <Check size={12} className="text-emerald-500" />
+                                            <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm">
+                                                <Check size={10} strokeWidth={4} />
+                                            </div>
                                         ) : dailyTarget > 0 && (
-                                            <span className="text-[9px] font-medium text-stone-300 tabular-nums">
+                                            <span className="text-[8px] font-black text-stone-300 tabular-nums">
                                                 {Math.round(progress)}%
                                             </span>
                                         )}
-                                        <Edit2 size={10} className="text-stone-200 group-hover:text-stone-900 transition-colors ml-1" />
+                                        <Edit2 size={10} className="text-stone-300 group-hover:text-stone-900 transition-colors ml-0.5" />
                                     </div>
                                 </div>
                             );
@@ -210,22 +272,23 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
            </div>
         </section>
 
-        <section className="bg-white px-6 py-5 rounded-3xl border border-stone-100 shadow-sm flex items-center justify-between mt-auto">
+        {/* 数据安全 */}
+        <section className="bg-white px-6 py-6 rounded-3xl border border-stone-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-5 mt-6">
             <div className="flex items-center gap-4">
-                <div className="p-2.5 bg-stone-100 text-stone-600 rounded-xl">
+                <div className="p-3 bg-stone-50 text-stone-900 rounded-xl shadow-inner border border-stone-100">
                     <Database size={20} />
                 </div>
-                <div>
-                    <h3 className="font-bold text-stone-900 text-[14px]">数据同步与维护</h3>
-                    <p className="text-[10px] font-medium text-stone-400 uppercase tracking-widest mt-0.5">
-                        版本 v1.1 • {format(currentDate, 'yyyy.MM.dd')}
+                <div className="text-center sm:text-left">
+                    <h3 className="font-black text-stone-900 text-sm tracking-tight">数据安全与维护</h3>
+                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em] mt-0.5">
+                        纯本地存储
                     </p>
                 </div>
             </div>
 
             <button 
                 onClick={() => setIsDataOverlayOpen(true)}
-                className="px-5 py-2.5 bg-stone-900 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest shadow-md active:scale-95 transition-all"
+                className="px-6 py-3 bg-stone-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all hover:bg-stone-800"
             >
                 管理数据
             </button>
@@ -233,12 +296,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
       </div>
 
       {isDataOverlayOpen && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden border border-stone-200 shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
                 <div className="px-6 py-5 bg-stone-50 border-b border-stone-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2.5">
                         <Database size={18} className="text-stone-900" />
-                        <h3 className="font-bold text-stone-900 text-[15px]">系统数据管理</h3>
+                        <h3 className="font-black text-stone-900 text-[14px]">数据管理</h3>
                     </div>
                     <button onClick={() => { setIsDataOverlayOpen(false); setShowClearConfirm(false); }} className="p-2 hover:bg-stone-200 rounded-full transition-colors text-stone-400">
                         <X size={20} />
@@ -249,21 +312,21 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                     <div className="grid grid-cols-2 gap-3">
                         <button 
                             onClick={onExportData}
-                            className="flex flex-col items-center justify-center gap-3 p-5 bg-stone-50 hover:bg-stone-100 rounded-2xl border border-stone-100 transition-all group"
+                            className="flex flex-col items-center justify-center gap-3 p-5 bg-stone-50 hover:bg-stone-100 rounded-2xl border border-stone-100 transition-all group shadow-sm"
                         >
-                            <div className="p-2 bg-white rounded-lg shadow-sm group-hover:scale-110 transition-transform">
-                                <Download size={24} className="text-stone-400 group-hover:text-stone-900" />
+                            <div className="p-2.5 bg-white rounded-xl shadow-md group-hover:scale-110 transition-transform">
+                                <Download size={22} className="text-stone-400 group-hover:text-stone-900" />
                             </div>
-                            <span className="text-[11px] font-bold text-stone-600">备份本地数据</span>
+                            <span className="text-[11px] font-black text-stone-700">导出备份</span>
                         </button>
                         <button 
                             onClick={() => fileInputRef.current?.click()}
-                            className="flex flex-col items-center justify-center gap-3 p-5 bg-stone-50 hover:bg-stone-100 rounded-2xl border border-stone-100 transition-all group"
+                            className="flex flex-col items-center justify-center gap-3 p-5 bg-stone-50 hover:bg-stone-100 rounded-2xl border border-stone-100 transition-all group shadow-sm"
                         >
-                            <div className="p-2 bg-white rounded-lg shadow-sm group-hover:scale-110 transition-transform">
-                                <Upload size={24} className="text-stone-400 group-hover:text-stone-900" />
+                            <div className="p-2.5 bg-white rounded-xl shadow-md group-hover:scale-110 transition-transform">
+                                <Upload size={22} className="text-stone-400 group-hover:text-stone-900" />
                             </div>
-                            <span className="text-[11px] font-bold text-stone-600">从文件恢复</span>
+                            <span className="text-[11px] font-black text-stone-700">导入恢复</span>
                             <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
                         </button>
                     </div>
@@ -278,24 +341,24 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
                                 }
                             }}
                             className={cn(
-                                "w-full py-4 rounded-2xl font-bold text-[12px] transition-all flex items-center justify-center gap-2",
+                                "w-full py-4 rounded-2xl font-black text-[12px] transition-all flex items-center justify-center gap-2 uppercase tracking-wider",
                                 showClearConfirm 
-                                    ? "bg-rose-500 text-white shadow-lg" 
-                                    : "bg-white border border-rose-100 text-rose-500 hover:bg-rose-50"
+                                    ? "bg-rose-600 text-white shadow-xl scale-105" 
+                                    : "bg-white border-2 border-rose-50 text-rose-500 hover:bg-rose-50"
                             )}
                         >
                             {showClearConfirm ? (
-                                <><AlertCircle size={16} /> 确定彻底清除所有数据？</>
+                                <><AlertCircle size={16} strokeWidth={3} /> 确认彻底清空？</>
                             ) : (
-                                <><Trash2 size={16} /> 重置所有本地数据</>
+                                <><Trash2 size={16} /> 清空本地数据</>
                             )}
                         </button>
                     </div>
                 </div>
 
                 <div className="px-6 py-4 bg-stone-50 border-t border-stone-100">
-                    <p className="text-[9px] text-stone-300 font-medium leading-relaxed text-center uppercase tracking-widest">
-                        清除操作将抹除所有行为日志、统计和积分
+                    <p className="text-[9px] text-stone-400 font-bold leading-relaxed text-center uppercase tracking-[0.2em]">
+                        警告：清空将抹除所有进度
                     </p>
                 </div>
             </div>

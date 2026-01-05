@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ChevronLeft, ChevronRight, ListTodo, LayoutGrid, ClipboardCheck, Settings, BarChart2, CalendarDays, StarHalf, TrendingUp, Edit3 } from 'lucide-react';
-import { format, addDays, subDays } from 'date-fns';
+import { ChevronLeft, ChevronRight, ListTodo, LayoutGrid, ClipboardCheck, Settings, BarChart2, CalendarDays, Star, TrendingUp, Edit3 } from 'lucide-react';
+import { format, addDays, subDays, differenceInCalendarDays } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import { AppState, Tab, Task, DayData, Objective, Todo, DayRating } from './types';
+import { AppState, Tab, Task, DayData, Objective, Todo, DayRating, RolloverSettings } from './types';
 import { loadState, saveState, DEFAULT_TASKS, DEFAULT_RATING_ITEMS, DEFAULT_SHOP_ITEMS, getInitialState } from './services/storage';
 import { cn, generateId, formatDate } from './utils';
 
@@ -22,21 +22,51 @@ export default function App() {
   const [isTaskStatsOpen, setIsTaskStatsOpen] = useState(false);
   const [isRatingStatsOpen, setIsRatingStatsOpen] = useState(false);
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
+  const [isClearing, setIsClearing] = useState(false);
   
   const [requestPoolOpen, setRequestPoolOpen] = useState(0); 
   
   const dateInputRef = useRef<HTMLInputElement>(null);
   
-  const [state, setState] = useState<AppState>(getInitialState());
+  const [state, setState] = useState<AppState | null>(null);
 
   useEffect(() => {
     const loaded = loadState();
+    
+    // Carry out rollover if enabled
+    if (loaded.rolloverSettings?.enabled) {
+      const today = new Date();
+      const todayStr = formatDate(today);
+      let hasChanges = false;
+
+      const updatedTodos = loaded.todos.map(todo => {
+        if (!todo.isCompleted && todo.startDate && todo.startDate < todayStr) {
+          const startDate = new Date(todo.startDate);
+          const diffDays = differenceInCalendarDays(today, startDate);
+          if (diffDays <= loaded.rolloverSettings.maxDays) {
+            hasChanges = true;
+            return { ...todo, startDate: todayStr };
+          }
+        }
+        return todo;
+      });
+
+      if (hasChanges) {
+        loaded.todos = updatedTodos;
+        saveState(loaded);
+      }
+    }
+    
     setState(loaded);
   }, []);
 
-  useEffect(() => { saveState(state); }, [state]);
+  useEffect(() => { 
+    // 自动保存逻辑：仅在 state 存在且未处于清空过程中时保存
+    if (state && !isClearing) {
+      saveState(state);
+    }
+  }, [state, isClearing]);
 
-  // 当切换标签时清除编辑状态
   useEffect(() => {
     setEditingStatus(null);
   }, [activeTab]);
@@ -44,6 +74,7 @@ export default function App() {
   const dateKey = formatDate(currentDate);
 
   const currentSchedule: DayData = useMemo(() => {
+      if (!state) return { hours: {} };
       const specificDayData = state.schedule[dateKey] || { hours: {} };
       const recurringData = state.recurringSchedule || {};
       const mergedHours: Record<number, string[]> = { ...specificDayData.hours };
@@ -54,42 +85,58 @@ export default function App() {
           mergedHours[hour] = Array.from(new Set([...existing, ...recTasks]));
       });
       return { hours: mergedHours };
-  }, [state.schedule, state.recurringSchedule, dateKey]);
+  }, [state?.schedule, state?.recurringSchedule, dateKey]);
 
-  const currentRecord: DayData = state.records[dateKey] || { hours: {} };
+  const currentRecord: DayData = (state?.records && state.records[dateKey]) || { hours: {} };
+
+  if (!state || isClearing) return <div className="h-screen w-screen flex items-center justify-center bg-stone-50 text-stone-400 font-black uppercase tracking-widest animate-pulse">Initializing Chronos...</div>;
 
   const updateScheduleHour = (hour: number, taskIds: string[]) => {
-    setState(prev => ({ ...prev, schedule: { ...prev.schedule, [dateKey]: { hours: { ...prev.schedule[dateKey]?.hours, [hour]: taskIds } } } }));
+    setState(prev => prev ? ({ ...prev, schedule: { ...prev.schedule, [dateKey]: { hours: { ...prev.schedule[dateKey]?.hours, [hour]: taskIds } } } }) : null);
   };
 
   const updateRecurringHour = (hour: number, taskIds: string[]) => {
-    setState(prev => ({ ...prev, recurringSchedule: { ...prev.recurringSchedule, [hour]: taskIds } }));
+    setState(prev => prev ? ({ ...prev, recurringSchedule: { ...prev.recurringSchedule, [hour]: taskIds } }) : null);
   };
   
   const updateRecordHour = (hour: number, taskIds: string[]) => {
-    setState(prev => ({ ...prev, records: { ...prev.records, [dateKey]: { hours: { ...currentRecord.hours, [hour]: taskIds } } } }));
+    setState(prev => {
+      if (!prev) return null;
+      const prevDay = prev.records[dateKey] || { hours: {} };
+      return { 
+        ...prev, 
+        records: { 
+          ...prev.records, 
+          [dateKey]: { hours: { ...prevDay.hours, [hour]: taskIds } } 
+        } 
+      };
+    });
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
-      setState(prev => ({ ...prev, tasks: prev.tasks.map(t => t.id === updatedTask.id ? updatedTask : t) }));
+      setState(prev => prev ? ({ ...prev, tasks: prev.tasks.map(t => t.id === updatedTask.id ? updatedTask : t) }) : null);
   };
 
   const handleAddTask = (newTaskPart: Omit<Task, 'id'>) => {
       const newTask = { ...newTaskPart, id: generateId() };
-      setState(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }));
+      setState(prev => prev ? ({ ...prev, tasks: [...prev.tasks, newTask] }) : null);
   };
 
   const handleDeleteTask = (taskId: string) => {
-      setState(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== taskId) }));
+      setState(prev => prev ? ({ ...prev, tasks: prev.tasks.filter(t => t.id !== taskId) }) : null);
   };
 
   const handleUpdateCategoryOrder = (newOrder: string[]) => {
-    setState(prev => ({ ...prev, categoryOrder: newOrder }));
+    setState(prev => prev ? ({ ...prev, categoryOrder: newOrder }) : null);
   };
 
-  const handleAddTodo = (todo: Todo) => { setState(prev => ({ ...prev, todos: [todo, ...prev.todos] })); };
-  const handleUpdateTodo = (todo: Todo) => { setState(prev => ({ ...prev, todos: prev.todos.map(t => t.id === todo.id ? todo : t) })); };
-  const handleDeleteTodo = (id: string) => { setState(prev => ({ ...prev, todos: prev.todos.filter(t => t.id !== id) })); };
+  const handleAddTodo = (todo: Todo) => { setState(prev => prev ? ({ ...prev, todos: [todo, ...prev.todos] }) : null); };
+  const handleUpdateTodo = (todo: Todo) => { setState(prev => prev ? ({ ...prev, todos: prev.todos.map(t => t.id === todo.id ? todo : t) }) : null); };
+  const handleDeleteTodo = (id: string) => { setState(prev => prev ? ({ ...prev, todos: prev.todos.filter(t => t.id !== id) }) : null); };
+
+  const handleUpdateRolloverSettings = (settings: RolloverSettings) => {
+      setState(prev => prev ? ({ ...prev, rolloverSettings: settings }) : null);
+  };
 
   const handleExportData = () => {
     const dataStr = JSON.stringify(state, null, 2);
@@ -117,11 +164,22 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  // 关键修正：使用软重置，不强制重刷页面
   const handleClearData = () => {
-    const defaultState = getInitialState();
-    setState(defaultState);
+    // 1. 设置标志以阻止自动保存
+    setIsClearing(true);
+    // 2. 清除 localStorage
     localStorage.removeItem('chronos_flow_data_v1');
-    setTimeout(() => window.location.reload(), 100);
+    // 3. 将 state 重置为默认初始状态
+    const initialState = getInitialState();
+    setState(initialState);
+    // 4. 重置 UI 导航
+    setActiveTab('todo');
+    setCurrentDate(new Date());
+    // 5. 解除阻止标志，此时 useEffect 将按照 initialState 进行保存
+    setTimeout(() => {
+      setIsClearing(false);
+    }, 100);
   };
 
   return (
@@ -129,47 +187,47 @@ export default function App() {
       <div className="w-full h-full sm:max-w-6xl sm:h-[96vh] bg-white sm:rounded-xl flex flex-col relative border border-stone-200 shadow-2xl overflow-hidden">
         
         <header className="pt-10 pb-2 px-4 bg-white/80 backdrop-blur-md flex items-center justify-between z-[60] shrink-0 border-b border-stone-100">
-           <div className="w-28 flex justify-start items-center">
+           <div className="w-20 sm:w-28 flex justify-start items-center transition-all">
                 {activeTab === 'todo' ? (
-                  <button onClick={() => setRequestPoolOpen(prev => prev + 1)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-primary transition-all group">
+                  <button onClick={() => setRequestPoolOpen(prev => prev + 1)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group">
                     <LayoutGrid size={18} className="group-hover:scale-110 transition-transform" />
-                    <span className="text-[8px] font-medium uppercase tracking-tighter">模板</span>
+                    <span className="text-[8px] font-black uppercase tracking-tighter">模板</span>
                   </button>
                 ) : editingStatus ? (
                   <div className="flex items-center gap-1.5 px-2.5 py-1 bg-stone-900 text-white rounded-lg animate-in fade-in slide-in-from-left-2 duration-300 shadow-sm border border-stone-800">
-                    <Edit3 size={12} className="text-emerald-400" />
-                    <span className="text-[10px] font-bold whitespace-nowrap">{editingStatus}</span>
+                    <Edit3 size={12} className="text-emerald-400 shrink-0" />
+                    <span className="text-[10px] font-black whitespace-nowrap">{editingStatus}</span>
                   </div>
                 ) : null}
            </div>
            
-           <div className="flex-1 flex items-center justify-center gap-2 sm:gap-4">
-                <button onClick={() => setCurrentDate(subDays(currentDate, 1))} className="p-2 text-stone-300 hover:text-stone-800 transition-all"><ChevronLeft size={20} /></button>
-                <button onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()} className="flex flex-col items-center justify-center px-2 py-1.5 rounded-lg transition-all">
-                    <span className="font-bold text-lg sm:text-xl text-stone-800">{format(currentDate, 'M月d日', { locale: zhCN })}</span>
-                    <span className="text-[9px] font-medium text-stone-400 uppercase tracking-widest mt-0.5">{format(currentDate, 'EEEE', { locale: zhCN })}</span>
+           <div className="flex-1 flex items-center justify-center gap-1 sm:gap-4">
+                <button onClick={() => setCurrentDate(subDays(currentDate, 1))} className="p-2 text-stone-300 hover:text-stone-800 transition-all shrink-0"><ChevronLeft size={20} /></button>
+                <button onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()} className="flex flex-col items-center justify-center px-2 py-1.5 rounded-lg transition-all min-w-[80px]">
+                    <span className="font-black text-lg sm:text-xl text-stone-800 whitespace-nowrap">{format(currentDate, 'M月d日', { locale: zhCN })}</span>
+                    <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mt-0.5 whitespace-nowrap">{format(currentDate, 'EEEE', { locale: zhCN })}</span>
                     <input ref={dateInputRef} type="date" className="absolute opacity-0 pointer-events-none" value={format(currentDate, 'yyyy-MM-dd')} onChange={(e) => e.target.value && setCurrentDate(new Date(e.target.value))} />
                 </button>
-                <button onClick={() => setCurrentDate(addDays(currentDate, 1))} className="p-2 text-stone-300 hover:text-stone-800 transition-all"><ChevronRight size={20} /></button>
+                <button onClick={() => setCurrentDate(addDays(currentDate, 1))} className="p-2 text-stone-300 hover:text-stone-800 transition-all shrink-0"><ChevronRight size={20} /></button>
            </div>
            
-           <div className="w-28 flex justify-end items-center">
+           <div className="w-20 sm:w-28 flex justify-end items-center transition-all">
                 {activeTab === 'todo' && (
-                  <button onClick={() => setIsTaskStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-primary transition-all group">
+                  <button onClick={() => setIsTaskStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group">
                     <CalendarDays size={18} className="group-hover:scale-110 transition-transform" />
-                    <span className="text-[8px] font-medium uppercase tracking-tighter">任务统计</span>
+                    <span className="text-[8px] font-black uppercase tracking-tighter">成就</span>
                   </button>
                 )}
                 {activeTab === 'record' && (
-                  <button onClick={() => setIsStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-primary transition-all group">
+                  <button onClick={() => setIsStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group">
                     <BarChart2 size={18} className="group-hover:scale-110 transition-transform" />
-                    <span className="text-[8px] font-medium uppercase tracking-tighter">时间统计</span>
+                    <span className="text-[8px] font-black uppercase tracking-tighter">时效</span>
                   </button>
                 )}
                 {activeTab === 'stats' && (
-                  <button onClick={() => setIsRatingStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-primary transition-all group">
+                  <button onClick={() => setIsRatingStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group">
                     <TrendingUp size={18} className="group-hover:scale-110 transition-transform" />
-                    <span className="text-[8px] font-medium uppercase tracking-tighter">打分统计</span>
+                    <span className="text-[8px] font-black uppercase tracking-tighter">走势</span>
                   </button>
                 )}
            </div>
@@ -182,13 +240,14 @@ export default function App() {
               onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo}
               onAddTask={handleAddTask} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask}
               requestPoolOpenTrigger={requestPoolOpen} categoryOrder={state.categoryOrder}
-              onAddObjective={(obj) => setState(prev => ({...prev, objectives: [...prev.objectives, obj], categoryOrder: [...prev.categoryOrder, obj.id]}))}
-              onDeleteObjective={(id) => setState(prev => ({
+              onAddObjective={(obj) => setState(prev => prev ? ({...prev, objectives: [...prev.objectives, obj], categoryOrder: [...prev.categoryOrder, obj.id]}) : null)}
+              onDeleteObjective={(id) => setState(prev => prev ? ({
                 ...prev, objectives: prev.objectives.filter(o => o.id !== id), 
                 categoryOrder: prev.categoryOrder.filter(c => c !== id),
                 tasks: prev.tasks.map(t => t.category === id ? { ...t, category: 'uncategorized' } : t),
                 todos: prev.todos.map(t => t.objectiveId === id ? { ...t, objectiveId: 'none' } : t)
-              }))}
+              }) : null)}
+              currentDate={currentDate}
             />
           )}
 
@@ -211,16 +270,16 @@ export default function App() {
             <RatingView 
               currentDate={currentDate} ratings={state.ratings} ratingItems={state.ratingItems}
               shopItems={state.shopItems} redemptions={state.redemptions}
-              onUpdateRating={(dateKey, rating) => setState(prev => ({ ...prev, ratings: { ...prev.ratings, [dateKey]: rating } }))}
-              onUpdateRatingItems={(items) => setState(prev => ({ ...prev, ratingItems: items }))}
-              onUpdateShopItems={(items) => setState(prev => ({ ...prev, shopItems: items }))}
+              onUpdateRating={(dateKey, rating) => setState(prev => prev ? ({ ...prev, ratings: { ...prev.ratings, [dateKey]: rating } }) : null)}
+              onUpdateRatingItems={(items) => setState(prev => prev ? ({ ...prev, ratingItems: items }) : null)}
+              onUpdateShopItems={(items) => setState(prev => prev ? ({ ...prev, shopItems: items }) : null)}
               onRedeem={(item) => {
                 const totalScore = Object.values(state.ratings).reduce<number>((acc, r: DayRating) => 
                   acc + Object.values(r.scores || {}).reduce<number>((a, b) => a + (b as number), 0), 0);
                 const spent = state.redemptions.reduce((acc, r) => acc + r.cost, 0);
                 if (totalScore - spent >= item.cost) {
                     const newRedemption = { id: generateId(), shopItemId: item.id, itemName: item.name, cost: item.cost, date: new Date().toISOString() };
-                    setState(prev => ({ ...prev, redemptions: [newRedemption, ...prev.redemptions] }));
+                    setState(prev => prev ? ({ ...prev, redemptions: [newRedemption, ...prev.redemptions] }) : null);
                 }
               }}
               isStatsOpen={false} onToggleStats={() => {}}
@@ -232,28 +291,30 @@ export default function App() {
                 tasks={state.tasks} categoryOrder={state.categoryOrder} objectives={state.objectives}
                 onAddTask={handleAddTask} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask} 
                 onUpdateCategoryOrder={handleUpdateCategoryOrder}
-                onAddObjective={(obj) => setState(prev => ({...prev, objectives: [...prev.objectives, obj], categoryOrder: [...prev.categoryOrder, obj.id]}))}
-                onUpdateObjective={(obj) => setState(prev => ({...prev, objectives: prev.objectives.map(o => o.id === obj.id ? obj : o)}))}
-                onDeleteObjective={(id) => setState(prev => ({
+                onAddObjective={(obj) => setState(prev => prev ? ({...prev, objectives: [...prev.objectives, obj], categoryOrder: [...prev.categoryOrder, obj.id]}) : null)}
+                onUpdateObjective={(obj) => setState(prev => prev ? ({...prev, objectives: prev.objectives.map(o => o.id === obj.id ? obj : o)}) : null)}
+                onDeleteObjective={(id) => setState(prev => prev ? ({
                     ...prev, objectives: prev.objectives.filter(o => o.id !== id), 
                     categoryOrder: prev.categoryOrder.filter(c => c !== id),
-                    tasks: prev.tasks.map(t => t.category === id ? { ...t, category: 'uncategorized' } : t),
+                    tasks: prev.tasks.map(t => t.category === id ? { ...t, category: id === 'uncategorized' ? 'uncategorized' : 'uncategorized' } : t),
                     todos: prev.todos.map(t => t.objectiveId === id ? { ...t, objectiveId: 'none' } : t)
-                }))}
+                }) : null)}
                 showInstallButton={false} onInstall={() => {}} 
                 onExportData={handleExportData} 
                 onImportData={handleImportData} 
                 onClearData={handleClearData} 
                 allSchedules={state.schedule} allRecords={state.records} currentDate={currentDate} 
+                rolloverSettings={state.rolloverSettings}
+                onUpdateRolloverSettings={handleUpdateRolloverSettings}
             />
           )}
         </main>
 
         <div className="h-24 bg-white border-t border-stone-100 flex items-start justify-center px-4 z-[60] shrink-0">
-            <nav className="w-full max-w-md mt-3 bg-stone-100 rounded-xl px-2 py-2 flex items-center justify-between border border-stone-200">
+            <nav className="w-full max-w-md mt-3 bg-stone-100 rounded-2xl px-2 py-2 flex items-center justify-between border border-stone-200 shadow-sm">
                 <NavButton label="安排" active={activeTab === 'todo'} onClick={() => setActiveTab('todo')} icon={<ListTodo size={18} />} />
+                <NavButton label="打分" active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} icon={<Star size={18} fill={activeTab === 'stats' ? "currentColor" : "none"} />} />
                 <NavButton label="记录" active={activeTab === 'record'} onClick={() => setActiveTab('record')} icon={<ClipboardCheck size={18} />} />
-                <NavButton label="打分" active={activeTab === 'stats'} onClick={() => setActiveTab('stats')} icon={<StarHalf size={18} />} />
                 <NavButton label="设置" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Settings size={18} />} />
             </nav>
         </div>
@@ -285,8 +346,8 @@ export default function App() {
 }
 
 const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) => (
-  <button onClick={onClick} className={cn("flex flex-col items-center justify-center flex-1 py-1.5 px-2 rounded-lg transition-all duration-300 gap-1", active ? "text-primary bg-white border border-stone-200 shadow-sm" : "text-stone-400 hover:text-stone-600")}>
+  <button onClick={onClick} className={cn("flex flex-col items-center justify-center flex-1 py-1.5 px-2 rounded-xl transition-all duration-300 gap-1", active ? "text-stone-900 bg-white border border-stone-200 shadow-md" : "text-stone-400 hover:text-stone-600")}>
     <div className={cn("transition-transform duration-300", active ? "scale-110" : "scale-100")}>{icon}</div>
-    <span className={cn("text-[8px] font-medium tracking-tight uppercase", active ? "opacity-100" : "opacity-60")}>{label}</span>
+    <span className={cn("text-[9px] font-black tracking-widest uppercase", active ? "opacity-100" : "opacity-60")}>{label}</span>
   </button>
 );

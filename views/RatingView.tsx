@@ -313,7 +313,6 @@ export const RatingView: React.FC<RatingViewProps> = ({
           <div className="flex justify-between items-end px-1">
              <div className="flex flex-col gap-0.5">
                 <h3 className="text-[10px] font-black text-stone-400 uppercase tracking-widest leading-none">自律评估</h3>
-                <p className="text-sm font-black text-stone-800 tracking-tight">多维度打分</p>
              </div>
              <button onClick={() => setIsConfigModalOpen(true)} className="p-2 bg-stone-50 hover:bg-stone-100 rounded-xl text-stone-400 border border-stone-100 transition-all active:scale-95">
                 <Settings2 size={16} />

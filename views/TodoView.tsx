@@ -5,8 +5,8 @@ import { TodoEditorModal } from '../components/TodoEditorModal';
 import { TaskEditorModal } from '../components/TaskEditorModal';
 import { ObjectiveEditorModal } from '../components/ObjectiveEditorModal';
 import { cn, generateId, formatDate } from '../utils';
-import { Plus, CheckCircle2, Circle, Star, Calendar, X, Edit2, LayoutGrid, Trash2 } from 'lucide-react';
-import { parseISO, isThisWeek, isThisMonth } from 'date-fns';
+import { Plus, CheckCircle2, Circle, Star, Calendar, X, Edit2, LayoutGrid, Trash2, Clock } from 'lucide-react';
+import { parseISO, isThisWeek, isThisMonth, differenceInDays } from 'date-fns';
 
 interface TodoViewProps {
   todos: Todo[];
@@ -23,6 +23,7 @@ interface TodoViewProps {
   onAddObjective?: (obj: Objective) => void;
   onUpdateObjective?: (obj: Objective) => void;
   onDeleteObjective?: (id: string) => void;
+  currentDate?: Date;
 }
 
 type FilterRange = 'unfinished' | 'today' | 'week' | 'month' | 'all';
@@ -41,7 +42,8 @@ export const TodoView: React.FC<TodoViewProps> = ({
   categoryOrder,
   onAddObjective,
   onUpdateObjective,
-  onDeleteObjective
+  onDeleteObjective,
+  currentDate = new Date()
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTaskPoolOpen, setIsTaskPoolOpen] = useState(false);
@@ -94,6 +96,31 @@ export const TodoView: React.FC<TodoViewProps> = ({
       return false;
     });
   }, [todos, activeFilter]);
+
+  // Calculate last execution for each template
+  const taskLastExecutionMap = useMemo(() => {
+    const map: Record<string, number | null> = {};
+    const today = new Date();
+    
+    tasks.forEach(task => {
+      const relatedTodos = todos.filter(t => t.isCompleted && t.completedAt && (t.templateId === task.id || t.title === task.name));
+      if (relatedTodos.length === 0) {
+        map[task.id] = null;
+      } else {
+        const lastTodo = relatedTodos.reduce((latest, current) => {
+          if (!latest.completedAt) return current;
+          if (!current.completedAt) return latest;
+          return current.completedAt > latest.completedAt ? current : latest;
+        });
+        if (lastTodo.completedAt) {
+          map[task.id] = differenceInDays(today, parseISO(lastTodo.completedAt));
+        } else {
+          map[task.id] = null;
+        }
+      }
+    });
+    return map;
+  }, [tasks, todos]);
 
   const frogs = filteredTodos.filter(t => t.isFrog && !t.isCompleted);
   const tadpoles = filteredTodos.filter(t => !t.isFrog && !t.isCompleted);
@@ -202,15 +229,17 @@ export const TodoView: React.FC<TodoViewProps> = ({
       setConfirmDeleteTaskId(null);
       return;
     }
+    // 使用当前选中的日期 (currentDate) 作为新待办的开始日期
     onAddTodo({
         id: generateId(),
         title: task.name,
         objectiveId: task.category || 'none',
+        templateId: task.id,
         isFrog: false,
         isCompleted: false,
         subTasks: [],
         createdAt: new Date().toISOString(),
-        startDate: formatDate(new Date())
+        startDate: formatDate(currentDate)
     });
     if (isTaskPoolOpen) setIsTaskPoolOpen(false);
   };
@@ -227,7 +256,7 @@ export const TodoView: React.FC<TodoViewProps> = ({
                     </div>
                     <button 
                         onClick={() => { 
-                            setEditingTask({ id: '', name: '', color: '#3b82f6', category: '' }); 
+                            setEditingTask({ id: '', name: '', color: '#3b82f6', category: activePoolCategory === 'all' ? '' : activePoolCategory }); 
                             setIsTaskEditorOpen(true); 
                         }}
                         className="mt-4 px-6 py-2.5 bg-stone-900 text-white rounded-xl text-[10px] font-medium uppercase tracking-widest shadow-lg active:scale-95 transition-all"
@@ -242,10 +271,10 @@ export const TodoView: React.FC<TodoViewProps> = ({
     return (
         <div className="flex flex-col h-full bg-white" onClick={() => { setConfirmDeleteTaskId(null); setConfirmDeleteTodoId(null); }}>
             <div className="p-4 border-b border-stone-100 flex items-center justify-between bg-white sticky top-0 z-10 shrink-0">
-                 <h3 className="text-[10px] font-medium text-stone-400 uppercase tracking-widest">常用模板</h3>
+                 <h3 className="text-[10px] font-black text-stone-900 uppercase tracking-widest">待办模板库</h3>
                  <button 
                     onClick={() => { 
-                        setEditingTask({ id: '', name: '', color: '#3b82f6', category: '' }); 
+                        setEditingTask({ id: '', name: '', color: '#3b82f6', category: activePoolCategory === 'all' ? '' : activePoolCategory }); 
                         setIsTaskEditorOpen(true); 
                     }}
                     className="p-1.5 bg-stone-900 text-white rounded-lg hover:bg-stone-800 transition-all shadow-sm"
@@ -261,46 +290,45 @@ export const TodoView: React.FC<TodoViewProps> = ({
                         <button
                             onClick={(e) => { e.stopPropagation(); setActivePoolCategory(cat); }}
                             className={cn(
-                                "px-3 py-1 rounded-full text-[9px] font-medium whitespace-nowrap transition-all border flex items-center gap-1",
+                                "px-3 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-all border flex items-center gap-1",
                                 activePoolCategory === cat 
-                                    ? "bg-stone-100 text-stone-800 border-stone-200" 
+                                    ? "bg-stone-900 text-white border-stone-900" 
                                     : "bg-white text-stone-400 border-stone-100 hover:border-stone-200"
                             )}
                         >
                             {getCategoryName(cat)}
-                            {cat !== 'all' && cat !== 'uncategorized' && activePoolCategory === cat && (
-                                <Edit2 
-                                    size={8} 
-                                    className="ml-1 hover:text-stone-900" 
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setEditingObjective(objectives.find(o => o.id === cat) || null);
-                                        setIsObjModalOpen(true);
-                                    }}
-                                />
-                            )}
                         </button>
                     </div>
                 ))}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar pb-10">
-                <div className="grid grid-cols-1 gap-2">
+                <div className="grid grid-cols-1 gap-2.5">
                     {filteredPoolTasks.map(task => {
                         const isConfirming = confirmDeleteTaskId === task.id;
+                        const lastExec = taskLastExecutionMap[task.id];
+                        const lastExecText = lastExec === null ? '从未执行' : (lastExec === 0 ? '今天' : `${lastExec}天前`);
+                        
                         return (
-                          <div key={task.id} onClick={() => handlePickTaskFromPool(task)} className="group p-3 bg-white border border-stone-100 rounded-lg flex items-center justify-between hover:border-stone-300 transition-all cursor-pointer shadow-sm hover:shadow-md active:scale-[0.99]">
-                              <div className="flex items-center gap-3 overflow-hidden flex-1">
-                                  <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: task.color }} />
-                                  <span className="text-[12px] font-medium text-stone-700 truncate">{task.name}</span>
+                          <div key={task.id} onClick={() => handlePickTaskFromPool(task)} className="group p-4 bg-white border border-stone-100 rounded-xl flex items-center justify-between hover:border-stone-300 transition-all cursor-pointer shadow-sm hover:shadow-md active:scale-[0.99] relative overflow-hidden">
+                              <div 
+                                className="absolute left-0 top-0 bottom-0 w-1 opacity-20"
+                                style={{ backgroundColor: task.color }}
+                              />
+                              <div className="flex flex-col gap-0.5 overflow-hidden flex-1 pl-1">
+                                  <span className="text-[12px] font-black text-stone-800 truncate">{task.name}</span>
+                                  <div className="flex items-center gap-1.5 text-stone-400">
+                                      <Clock size={10} />
+                                      <span className="text-[9px] font-bold uppercase tracking-wider">{lastExecText}</span>
+                                  </div>
                               </div>
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all ml-2">
+                              <div className="flex items-center gap-1 ml-2">
                                   {!isConfirming && (
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); setEditingTask(task); setIsTaskEditorOpen(true); }} 
-                                        className="p-1.5 text-stone-300 hover:text-stone-800 hover:bg-stone-50 rounded-md"
+                                        className="p-1.5 text-stone-300 hover:text-stone-900 bg-stone-50 hover:bg-stone-100 rounded-md transition-colors opacity-0 group-hover:opacity-100"
                                     >
-                                        <Edit2 size={14} />
+                                        <Edit2 size={12} />
                                     </button>
                                   )}
                                   <button 
@@ -315,17 +343,20 @@ export const TodoView: React.FC<TodoViewProps> = ({
                                       }} 
                                       className={cn(
                                         "p-1.5 rounded-md transition-all",
-                                        isConfirming ? "bg-red-500 text-white" : "text-stone-300 hover:text-red-500 hover:bg-red-50"
+                                        isConfirming ? "bg-red-500 text-white" : "text-stone-300 hover:text-red-500 bg-stone-50 hover:bg-red-50 opacity-0 group-hover:opacity-100"
                                       )}
                                   >
-                                      {isConfirming ? <span className="text-[8px] font-medium px-1">确认删除?</span> : <Trash2 size={14} />}
+                                      {isConfirming ? <span className="text-[8px] font-black px-1">确认?</span> : <Trash2 size={12} />}
                                   </button>
                               </div>
                           </div>
                         );
                     })}
                     {filteredPoolTasks.length === 0 && (
-                        <div className="py-8 text-center text-[10px] text-stone-300 font-medium">暂无有效模板</div>
+                        <div className="py-12 text-center flex flex-col items-center gap-2 opacity-30">
+                            <LayoutGrid size={24} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">暂无模板</span>
+                        </div>
                     )}
                 </div>
             </div>
@@ -334,22 +365,31 @@ export const TodoView: React.FC<TodoViewProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col md:flex-row bg-white" onClick={() => { setConfirmDeleteTodoId(null); setConfirmDeleteTaskId(null); }}>
-      <div className="flex-1 flex flex-col h-full border-r border-stone-50">
-          <div className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-stone-100 px-5 py-3 flex items-center gap-3">
+    <div className="h-full flex flex-col lg:flex-row bg-white overflow-hidden" onClick={() => { setConfirmDeleteTodoId(null); setConfirmDeleteTaskId(null); }}>
+      {/* Left Column: Arranged Todos */}
+      <div className="flex-1 flex flex-col h-full border-r border-stone-50 bg-white">
+          <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-stone-100 px-5 py-3.5 flex items-center gap-3 shadow-sm">
               <div className="flex-1 overflow-x-auto no-scrollbar flex gap-2">
                   {(Object.keys(filterLabels) as FilterRange[]).map((range) => (
-                      <button key={range} onClick={() => setActiveFilter(range)} className={cn("px-4 py-1.5 rounded-full text-[10px] font-medium border transition-all", activeFilter === range ? "bg-stone-900 text-white border-stone-900" : "bg-white text-stone-400 border-stone-100 hover:border-stone-200")}>{filterLabels[range]}</button>
+                      <button key={range} onClick={() => setActiveFilter(range)} className={cn("px-4 py-1.5 rounded-full text-[10px] font-black border transition-all uppercase tracking-wider", activeFilter === range ? "bg-stone-900 text-white border-stone-900 shadow-md" : "bg-white text-stone-400 border-stone-100 hover:border-stone-200")}>{filterLabels[range]}</button>
                   ))}
               </div>
               <button onClick={() => { setEditingTodo(null); setIsModalOpen(true); }} className="w-10 h-10 bg-stone-900 text-white rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all shrink-0"><Plus size={22} /></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-5 pb-32 space-y-8 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-5 pb-32 space-y-10 custom-scrollbar bg-white/50">
             <section>
-              <div className="flex items-center gap-2 mb-4"><div className="px-2 py-0.5 bg-amber-100 text-amber-600 rounded text-[9px] font-medium uppercase tracking-widest">核心任务</div><div className="h-px flex-1 bg-amber-50" /></div>
+              <div className="flex items-center gap-3 mb-5 px-1">
+                  <div className="px-3 py-1 bg-amber-100 text-amber-700 rounded-lg text-[9px] font-black uppercase tracking-[0.15em] border border-amber-200 shadow-sm">核心焦点</div>
+                  <div className="h-px flex-1 bg-amber-100" />
+              </div>
               {frogs.map(t => <TodoItem key={t.id} todo={t} />)}
-              {frogs.length === 0 && <div className="text-center py-6 text-stone-300 text-[10px] font-medium">无今日核心</div>}
+              {frogs.length === 0 && (
+                <div className="text-center py-10 rounded-2xl border-2 border-dashed border-stone-50 bg-stone-50/20 text-stone-300">
+                    <Star size={24} className="mx-auto mb-2 opacity-20" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">今日无核心挑战</p>
+                </div>
+              )}
             </section>
             
             {displayObjectives.map(obj => {
@@ -357,8 +397,8 @@ export const TodoView: React.FC<TodoViewProps> = ({
                 if (!tasks || tasks.length === 0) return null;
                 return (
                     <section key={obj.id}>
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="px-2 py-0.5 rounded text-[9px] font-medium uppercase tracking-widest" style={{ backgroundColor: `${obj.color}15`, color: obj.color }}>
+                        <div className="flex items-center gap-3 mb-5 px-1">
+                            <div className="px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-[0.15em] border shadow-sm" style={{ backgroundColor: `${obj.color}15`, color: obj.color, borderColor: `${obj.color}30` }}>
                                 {obj.title}
                             </div>
                             <div className="h-px flex-1" style={{ backgroundColor: `${obj.color}15` }} />
@@ -370,35 +410,46 @@ export const TodoView: React.FC<TodoViewProps> = ({
 
             {uncategorizedTadpoles.length > 0 && (
                 <section>
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="px-2 py-0.5 bg-stone-100 text-stone-400 rounded text-[9px] font-medium uppercase tracking-widest">
-                            默认清单
+                    <div className="flex items-center gap-3 mb-5 px-1">
+                        <div className="px-3 py-1 bg-stone-100 text-stone-500 rounded-lg text-[9px] font-black uppercase tracking-[0.15em] border border-stone-200 shadow-sm">
+                            常规待办
                         </div>
-                        <div className="h-px flex-1 bg-stone-50" />
+                        <div className="h-px flex-1 bg-stone-100" />
                     </div>
                     {uncategorizedTadpoles.map(t => <TodoItem key={t.id} todo={t} />)}
                 </section>
             )}
 
             {completed.length > 0 && (
-              <section>
-                <div className="flex items-center gap-2 mb-4"><div className="px-2 py-0.5 bg-emerald-100 text-emerald-600 rounded text-[9px] font-medium uppercase tracking-widest">已达成</div><div className="h-px flex-1 bg-emerald-50" /></div>
+              <section className="pt-4 opacity-70">
+                <div className="flex items-center gap-3 mb-5 px-1">
+                    <div className="px-3 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[9px] font-black uppercase tracking-[0.15em] border border-emerald-100 shadow-sm">任务达成</div>
+                    <div className="h-px flex-1 bg-emerald-50" />
+                </div>
                 {completed.map(t => <TodoItem key={t.id} todo={t} />)}
               </section>
             )}
           </div>
       </div>
 
-      <aside className="hidden md:flex w-64 flex-col border-l border-stone-100 shrink-0">
-          <div className="p-5 border-b border-stone-100"><h2 className="text-[10px] font-medium text-stone-400 uppercase tracking-widest text-right">待办模板库</h2></div>
+      {/* Right Column: Template Pool (Fixed on Desktop) */}
+      <aside className="hidden lg:flex w-[400px] flex-col border-l border-stone-100 shrink-0 bg-stone-50/20">
           <div className="flex-1 overflow-hidden">{renderTaskPool()}</div>
       </aside>
 
+      {/* Mobile Template Pool Toggle */}
+      <button 
+        onClick={() => setIsTaskPoolOpen(true)}
+        className="lg:hidden fixed bottom-28 right-6 w-14 h-14 bg-white border border-stone-200 text-stone-900 rounded-2xl flex items-center justify-center shadow-2xl z-50 active:scale-90 transition-all"
+      >
+        <LayoutGrid size={24} />
+      </button>
+
       {isTaskPoolOpen && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl w-full max-md h-[80vh] overflow-hidden flex flex-col shadow-2xl border border-stone-300">
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm lg:hidden">
+          <div className="bg-white rounded-2xl w-full max-w-md h-[80vh] overflow-hidden flex flex-col shadow-2xl border border-stone-300">
               <div className="flex justify-between items-center px-6 py-4 bg-stone-50 border-b border-stone-100">
-                  <h3 className="font-medium text-sm text-stone-800">待办模板库</h3>
+                  <h3 className="font-black text-sm text-stone-800 uppercase tracking-widest">模板选择</h3>
                   <button onClick={() => setIsTaskPoolOpen(false)} className="p-2 hover:bg-stone-200 rounded-full text-stone-400"><X size={20} /></button>
               </div>
               <div className="flex-1 overflow-hidden">{renderTaskPool()}</div>
@@ -406,7 +457,16 @@ export const TodoView: React.FC<TodoViewProps> = ({
         </div>
       )}
 
-      <TodoEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} todo={editingTodo} objectives={objectives} onSave={(todo) => editingTodo ? onUpdateTodo(todo) : onAddTodo(todo)} onDelete={onDeleteTodo} frogCount={frogs.length} />
+      <TodoEditorModal 
+          isOpen={isModalOpen} 
+          onClose={() => setIsModalOpen(false)} 
+          todo={editingTodo} 
+          objectives={objectives} 
+          onSave={(todo) => editingTodo ? onUpdateTodo(todo) : onAddTodo(todo)} 
+          onDelete={onDeleteTodo} 
+          frogCount={frogs.length}
+          defaultDate={currentDate} 
+      />
       
       <TaskEditorModal 
         isOpen={isTaskEditorOpen} 
