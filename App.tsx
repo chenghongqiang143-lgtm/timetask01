@@ -181,10 +181,11 @@ export default function App() {
     <div className="h-screen w-screen bg-stone-50 flex items-center justify-center overflow-hidden font-sans text-stone-800 p-0 sm:p-4">
       <div className="w-full h-full sm:max-w-6xl sm:h-[96vh] bg-white sm:rounded-xl flex flex-col relative border border-stone-200 shadow-2xl overflow-hidden">
         
-        <header className="pt-8 pb-3 px-4 bg-white/80 backdrop-blur-md flex items-center justify-between z-[60] shrink-0 border-b border-stone-100">
+        {/* Added px-8 to header to create more distance from edges */}
+        <header className="pt-8 pb-3 px-8 bg-white/80 backdrop-blur-md flex items-center justify-between z-[60] shrink-0 border-b border-stone-100">
            <div className="w-20 sm:w-28 flex justify-start items-center transition-all">
                 {activeTab === 'todo' ? (
-                  <button onClick={() => setIsTaskPoolOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group">
+                  <button onClick={() => setIsTaskPoolOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group active:scale-90">
                     <LayoutGrid size={18} className="group-hover:scale-110 transition-transform" />
                     <span className="text-[8px] font-black uppercase tracking-tighter">模板</span>
                   </button>
@@ -218,19 +219,19 @@ export default function App() {
            
            <div className="w-20 sm:w-28 flex justify-end items-center transition-all">
                 {activeTab === 'todo' && (
-                  <button onClick={() => setIsTaskStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group">
+                  <button onClick={() => setIsTaskStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group active:scale-90">
                     <CalendarDays size={18} className="group-hover:scale-110 transition-transform" />
                     <span className="text-[8px] font-black uppercase tracking-tighter">成就</span>
                   </button>
                 )}
                 {activeTab === 'record' && (
-                  <button onClick={() => setIsStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group">
+                  <button onClick={() => setIsStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group active:scale-90">
                     <BarChart2 size={18} className="group-hover:scale-110 transition-transform" />
                     <span className="text-[8px] font-black uppercase tracking-tighter">时效</span>
                   </button>
                 )}
                 {activeTab === 'stats' && (
-                  <button onClick={() => setIsRatingStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group">
+                  <button onClick={() => setIsRatingStatsOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group active:scale-90">
                     <TrendingUp size={18} className="group-hover:scale-110 transition-transform" />
                     <span className="text-[8px] font-black uppercase tracking-tighter">走势</span>
                   </button>
@@ -280,7 +281,6 @@ export default function App() {
               onUpdateRatingItems={(items) => setState(prev => prev ? ({ ...prev, ratingItems: items }) : null)}
               onUpdateShopItems={(items) => setState(prev => prev ? ({ ...prev, shopItems: items }) : null)}
               onRedeem={(item) => {
-                /* Fix: 'day' was undefined, replaced with iteration variable 'r' */
                 const totalScore = Object.values(state.ratings).reduce<number>((acc, r: DayRating) => 
                   acc + Object.values(r.scores || {}).reduce<number>((a, b) => a + (b as number), 0), 0);
                 const spent = state.redemptions.reduce((acc, r) => acc + r.cost, 0);
@@ -303,7 +303,7 @@ export default function App() {
                 onDeleteObjective={(id) => setState(prev => prev ? ({
                     ...prev, objectives: prev.objectives.filter(o => o.id !== id), 
                     categoryOrder: prev.categoryOrder.filter(c => c !== id),
-                    tasks: prev.tasks.map(t => t.category === id ? { ...t, category: id === 'uncategorized' ? 'uncategorized' : 'uncategorized' } : t),
+                    tasks: prev.tasks.map(t => t.category === id ? { ...t, category: 'uncategorized' } : t),
                     todos: prev.todos.map(t => t.objectiveId === id ? { ...t, objectiveId: 'none' } : t)
                 }) : null)}
                 showInstallButton={false} onInstall={() => {}} 
