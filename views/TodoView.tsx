@@ -18,7 +18,8 @@ interface TodoViewProps {
   onAddTask?: (task: Task) => void;
   onUpdateTask?: (task: Task) => void;
   onDeleteTask?: (id: string) => void;
-  requestPoolOpenTrigger?: number;
+  isTaskPoolOpen: boolean;
+  setIsTaskPoolOpen: (open: boolean) => void;
   categoryOrder?: string[];
   onAddObjective?: (obj: Objective) => void;
   onUpdateObjective?: (obj: Objective) => void;
@@ -38,7 +39,8 @@ export const TodoView: React.FC<TodoViewProps> = ({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
-  requestPoolOpenTrigger,
+  isTaskPoolOpen,
+  setIsTaskPoolOpen,
   categoryOrder,
   onAddObjective,
   onUpdateObjective,
@@ -46,7 +48,6 @@ export const TodoView: React.FC<TodoViewProps> = ({
   currentDate = new Date()
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isTaskPoolOpen, setIsTaskPoolOpen] = useState(false);
   const [isTaskEditorOpen, setIsTaskEditorOpen] = useState(false);
   const [isObjModalOpen, setIsObjModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -58,10 +59,6 @@ export const TodoView: React.FC<TodoViewProps> = ({
   const [confirmDeleteTaskId, setConfirmDeleteTaskId] = useState<string | null>(null);
 
   const [activeFilter, setActiveFilter] = useState<FilterRange>('today');
-
-  useEffect(() => {
-    if (requestPoolOpenTrigger && requestPoolOpenTrigger > 0) setIsTaskPoolOpen(true);
-  }, [requestPoolOpenTrigger]);
 
   useEffect(() => {
     setConfirmDeleteTodoId(null);
@@ -113,7 +110,11 @@ export const TodoView: React.FC<TodoViewProps> = ({
           return current.completedAt > latest.completedAt ? current : latest;
         });
         if (lastTodo.completedAt) {
-          map[task.id] = differenceInDays(today, parseISO(lastTodo.completedAt));
+            try {
+                map[task.id] = differenceInDays(today, parseISO(lastTodo.completedAt));
+            } catch (e) {
+                map[task.id] = null;
+            }
         } else {
           map[task.id] = null;
         }
@@ -229,7 +230,6 @@ export const TodoView: React.FC<TodoViewProps> = ({
       setConfirmDeleteTaskId(null);
       return;
     }
-    // 使用当前选中的日期 (currentDate) 作为新待办的开始日期
     onAddTodo({
         id: generateId(),
         title: task.name,
@@ -290,7 +290,7 @@ export const TodoView: React.FC<TodoViewProps> = ({
                         <button
                             onClick={(e) => { e.stopPropagation(); setActivePoolCategory(cat); }}
                             className={cn(
-                                "px-3 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-all border flex items-center gap-1",
+                                "px-3 py-1 rounded-full text-[9px] font-bold whitespace-nowrap transition-all border flex items-center gap-1 shrink-0",
                                 activePoolCategory === cat 
                                     ? "bg-stone-900 text-white border-stone-900" 
                                     : "bg-white text-stone-400 border-stone-100 hover:border-stone-200"
@@ -307,7 +307,7 @@ export const TodoView: React.FC<TodoViewProps> = ({
                     {filteredPoolTasks.map(task => {
                         const isConfirming = confirmDeleteTaskId === task.id;
                         const lastExec = taskLastExecutionMap[task.id];
-                        const lastExecText = lastExec === null ? '从未执行' : (lastExec === 0 ? '今天' : `${lastExec}天前`);
+                        const lastExecText = lastExec === null ? '从未执行' : (lastExec === 0 ? '今天' : (!isNaN(lastExec) ? `${lastExec}天前` : ''));
                         
                         return (
                           <div key={task.id} onClick={() => handlePickTaskFromPool(task)} className="group p-4 bg-white border border-stone-100 rounded-xl flex items-center justify-between hover:border-stone-300 transition-all cursor-pointer shadow-sm hover:shadow-md active:scale-[0.99] relative overflow-hidden">
@@ -322,13 +322,13 @@ export const TodoView: React.FC<TodoViewProps> = ({
                                       <span className="text-[9px] font-bold uppercase tracking-wider">{lastExecText}</span>
                                   </div>
                               </div>
-                              <div className="flex items-center gap-1 ml-2">
+                              <div className="flex items-center gap-2.5 ml-2">
                                   {!isConfirming && (
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); setEditingTask(task); setIsTaskEditorOpen(true); }} 
-                                        className="p-1.5 text-stone-300 hover:text-stone-900 bg-stone-50 hover:bg-stone-100 rounded-md transition-colors opacity-0 group-hover:opacity-100"
+                                        className="p-2.5 text-stone-400 hover:text-stone-900 bg-stone-50 hover:bg-stone-100 rounded-lg transition-colors opacity-0 group-hover:opacity-100 shadow-sm border border-transparent hover:border-stone-200"
                                     >
-                                        <Edit2 size={12} />
+                                        <Edit2 size={16} />
                                     </button>
                                   )}
                                   <button 
@@ -342,11 +342,11 @@ export const TodoView: React.FC<TodoViewProps> = ({
                                           }
                                       }} 
                                       className={cn(
-                                        "p-1.5 rounded-md transition-all",
-                                        isConfirming ? "bg-red-500 text-white" : "text-stone-300 hover:text-red-500 bg-stone-50 hover:bg-red-50 opacity-0 group-hover:opacity-100"
+                                        "p-2.5 rounded-lg transition-all shadow-sm",
+                                        isConfirming ? "bg-red-500 text-white" : "text-stone-300 hover:text-red-500 bg-stone-50 hover:bg-red-50 opacity-0 group-hover:opacity-100 border border-transparent hover:border-red-100"
                                       )}
                                   >
-                                      {isConfirming ? <span className="text-[8px] font-black px-1">确认?</span> : <Trash2 size={12} />}
+                                      {isConfirming ? <span className="text-[10px] font-black px-1.5">确认?</span> : <Trash2 size={16} />}
                                   </button>
                               </div>
                           </div>
@@ -371,7 +371,7 @@ export const TodoView: React.FC<TodoViewProps> = ({
           <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-stone-100 px-5 py-3.5 flex items-center gap-3 shadow-sm">
               <div className="flex-1 overflow-x-auto no-scrollbar flex gap-2">
                   {(Object.keys(filterLabels) as FilterRange[]).map((range) => (
-                      <button key={range} onClick={() => setActiveFilter(range)} className={cn("px-4 py-1.5 rounded-full text-[10px] font-black border transition-all uppercase tracking-wider", activeFilter === range ? "bg-stone-900 text-white border-stone-900 shadow-md" : "bg-white text-stone-400 border-stone-100 hover:border-stone-200")}>{filterLabels[range]}</button>
+                      <button key={range} onClick={() => setActiveFilter(range)} className={cn("px-4 py-1.5 rounded-full text-[10px] font-black border transition-all uppercase tracking-wider whitespace-nowrap shrink-0", activeFilter === range ? "bg-stone-900 text-white border-stone-900 shadow-md" : "bg-white text-stone-400 border-stone-100 hover:border-stone-200")}>{filterLabels[range]}</button>
                   ))}
               </div>
               <button onClick={() => { setEditingTodo(null); setIsModalOpen(true); }} className="w-10 h-10 bg-stone-900 text-white rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all shrink-0"><Plus size={22} /></button>
@@ -437,16 +437,9 @@ export const TodoView: React.FC<TodoViewProps> = ({
           <div className="flex-1 overflow-hidden">{renderTaskPool()}</div>
       </aside>
 
-      {/* Mobile Template Pool Toggle */}
-      <button 
-        onClick={() => setIsTaskPoolOpen(true)}
-        className="lg:hidden fixed bottom-28 right-6 w-14 h-14 bg-white border border-stone-200 text-stone-900 rounded-2xl flex items-center justify-center shadow-2xl z-50 active:scale-90 transition-all"
-      >
-        <LayoutGrid size={24} />
-      </button>
-
+      {/* 模板选择弹窗：去除了 lg:hidden 限制，确保所有设备下点击顶栏按钮都能弹出 */}
       {isTaskPoolOpen && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm lg:hidden">
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-stone-900/60 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-md h-[80vh] overflow-hidden flex flex-col shadow-2xl border border-stone-300">
               <div className="flex justify-between items-center px-6 py-4 bg-stone-50 border-b border-stone-100">
                   <h3 className="font-black text-sm text-stone-800 uppercase tracking-widest">模板选择</h3>

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ChevronLeft, ChevronRight, ListTodo, LayoutGrid, ClipboardCheck, Settings, BarChart2, CalendarDays, Star, TrendingUp, Edit3 } from 'lucide-react';
-import { format, addDays, subDays, differenceInCalendarDays } from 'date-fns';
+import { ChevronLeft, ChevronRight, ListTodo, LayoutGrid, ClipboardCheck, Settings, BarChart2, CalendarDays, Star, TrendingUp, Edit3, RotateCcw } from 'lucide-react';
+import { format, addDays, subDays, differenceInCalendarDays, isSameDay } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { AppState, Tab, Task, DayData, Objective, Todo, DayRating, RolloverSettings } from './types';
 import { loadState, saveState, DEFAULT_TASKS, DEFAULT_RATING_ITEMS, DEFAULT_SHOP_ITEMS, getInitialState } from './services/storage';
@@ -24,7 +24,8 @@ export default function App() {
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
   
-  const [requestPoolOpen, setRequestPoolOpen] = useState(0); 
+  // 管理模板库开启状态
+  const [isTaskPoolOpen, setIsTaskPoolOpen] = useState(false); 
   
   const dateInputRef = useRef<HTMLInputElement>(null);
   
@@ -61,7 +62,6 @@ export default function App() {
   }, []);
 
   useEffect(() => { 
-    // 自动保存逻辑：仅在 state 存在且未处于清空过程中时保存
     if (state && !isClearing) {
       saveState(state);
     }
@@ -72,6 +72,7 @@ export default function App() {
   }, [activeTab]);
 
   const dateKey = formatDate(currentDate);
+  const isToday = isSameDay(currentDate, new Date());
 
   const currentSchedule: DayData = useMemo(() => {
       if (!state) return { hours: {} };
@@ -164,19 +165,13 @@ export default function App() {
     reader.readAsText(file);
   };
 
-  // 关键修正：使用软重置，不强制重刷页面
   const handleClearData = () => {
-    // 1. 设置标志以阻止自动保存
     setIsClearing(true);
-    // 2. 清除 localStorage
     localStorage.removeItem('chronos_flow_data_v1');
-    // 3. 将 state 重置为默认初始状态
     const initialState = getInitialState();
     setState(initialState);
-    // 4. 重置 UI 导航
     setActiveTab('todo');
     setCurrentDate(new Date());
-    // 5. 解除阻止标志，此时 useEffect 将按照 initialState 进行保存
     setTimeout(() => {
       setIsClearing(false);
     }, 100);
@@ -186,10 +181,10 @@ export default function App() {
     <div className="h-screen w-screen bg-stone-50 flex items-center justify-center overflow-hidden font-sans text-stone-800 p-0 sm:p-4">
       <div className="w-full h-full sm:max-w-6xl sm:h-[96vh] bg-white sm:rounded-xl flex flex-col relative border border-stone-200 shadow-2xl overflow-hidden">
         
-        <header className="pt-10 pb-2 px-4 bg-white/80 backdrop-blur-md flex items-center justify-between z-[60] shrink-0 border-b border-stone-100">
+        <header className="pt-8 pb-3 px-4 bg-white/80 backdrop-blur-md flex items-center justify-between z-[60] shrink-0 border-b border-stone-100">
            <div className="w-20 sm:w-28 flex justify-start items-center transition-all">
                 {activeTab === 'todo' ? (
-                  <button onClick={() => setRequestPoolOpen(prev => prev + 1)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group">
+                  <button onClick={() => setIsTaskPoolOpen(true)} className="flex flex-col items-center gap-0.5 text-stone-300 hover:text-stone-900 transition-all group">
                     <LayoutGrid size={18} className="group-hover:scale-110 transition-transform" />
                     <span className="text-[8px] font-black uppercase tracking-tighter">模板</span>
                   </button>
@@ -201,13 +196,23 @@ export default function App() {
                 ) : null}
            </div>
            
-           <div className="flex-1 flex items-center justify-center gap-1 sm:gap-4">
+           <div className="flex-1 flex items-center justify-center gap-1 sm:gap-4 relative group">
                 <button onClick={() => setCurrentDate(subDays(currentDate, 1))} className="p-2 text-stone-300 hover:text-stone-800 transition-all shrink-0"><ChevronLeft size={20} /></button>
-                <button onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()} className="flex flex-col items-center justify-center px-2 py-1.5 rounded-lg transition-all min-w-[80px]">
-                    <span className="font-black text-lg sm:text-xl text-stone-800 whitespace-nowrap">{format(currentDate, 'M月d日', { locale: zhCN })}</span>
-                    <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mt-0.5 whitespace-nowrap">{format(currentDate, 'EEEE', { locale: zhCN })}</span>
-                    <input ref={dateInputRef} type="date" className="absolute opacity-0 pointer-events-none" value={format(currentDate, 'yyyy-MM-dd')} onChange={(e) => e.target.value && setCurrentDate(new Date(e.target.value))} />
-                </button>
+                <div className="flex flex-col items-center relative">
+                    <button onClick={() => dateInputRef.current?.showPicker?.() || dateInputRef.current?.click()} className="flex flex-col items-center justify-center px-2 py-1.5 rounded-lg transition-all min-w-[80px]">
+                        <span className="font-black text-lg sm:text-xl text-stone-800 whitespace-nowrap">{format(currentDate, 'M月d日', { locale: zhCN })}</span>
+                        <span className="text-[9px] font-bold text-stone-400 uppercase tracking-widest mt-0.5 whitespace-nowrap">{format(currentDate, 'EEEE', { locale: zhCN })}</span>
+                        <input ref={dateInputRef} type="date" className="absolute opacity-0 pointer-events-none" value={format(currentDate, 'yyyy-MM-dd')} onChange={(e) => e.target.value && setCurrentDate(new Date(e.target.value))} />
+                    </button>
+                    {!isToday && (
+                        <button 
+                            onClick={() => setCurrentDate(new Date())}
+                            className="absolute -bottom-8 left-1/2 -translate-x-1/2 bg-stone-900 text-white text-[9px] font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 animate-in slide-in-from-top-2 fade-in duration-200 z-[70] hover:bg-stone-800 active:scale-95 transition-all whitespace-nowrap ring-2 ring-white"
+                        >
+                            <RotateCcw size={10} className="text-emerald-400" /> 回今日
+                        </button>
+                    )}
+                </div>
                 <button onClick={() => setCurrentDate(addDays(currentDate, 1))} className="p-2 text-stone-300 hover:text-stone-800 transition-all shrink-0"><ChevronRight size={20} /></button>
            </div>
            
@@ -239,7 +244,8 @@ export default function App() {
               todos={state.todos} objectives={state.objectives} tasks={state.tasks}
               onAddTodo={handleAddTodo} onUpdateTodo={handleUpdateTodo} onDeleteTodo={handleDeleteTodo}
               onAddTask={handleAddTask} onUpdateTask={handleUpdateTask} onDeleteTask={handleDeleteTask}
-              requestPoolOpenTrigger={requestPoolOpen} categoryOrder={state.categoryOrder}
+              isTaskPoolOpen={isTaskPoolOpen} setIsTaskPoolOpen={setIsTaskPoolOpen}
+              categoryOrder={state.categoryOrder}
               onAddObjective={(obj) => setState(prev => prev ? ({...prev, objectives: [...prev.objectives, obj], categoryOrder: [...prev.categoryOrder, obj.id]}) : null)}
               onDeleteObjective={(id) => setState(prev => prev ? ({
                 ...prev, objectives: prev.objectives.filter(o => o.id !== id), 
@@ -274,6 +280,7 @@ export default function App() {
               onUpdateRatingItems={(items) => setState(prev => prev ? ({ ...prev, ratingItems: items }) : null)}
               onUpdateShopItems={(items) => setState(prev => prev ? ({ ...prev, shopItems: items }) : null)}
               onRedeem={(item) => {
+                /* Fix: 'day' was undefined, replaced with iteration variable 'r' */
                 const totalScore = Object.values(state.ratings).reduce<number>((acc, r: DayRating) => 
                   acc + Object.values(r.scores || {}).reduce<number>((a, b) => a + (b as number), 0), 0);
                 const spent = state.redemptions.reduce((acc, r) => acc + r.cost, 0);

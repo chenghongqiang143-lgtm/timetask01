@@ -292,7 +292,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
         <div className="sticky top-0 bg-white/95 backdrop-blur-md z-40 px-5 py-3 border-b border-stone-100 flex items-center justify-between">
             <div className="flex items-center gap-6 w-full">
                 <div className="flex-1 flex items-center justify-center gap-2 text-stone-300">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em]">安排 (Plan)</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] whitespace-nowrap">安排</span>
                     <ChevronLeft size={12} />
                 </div>
                 <div className="w-14 flex items-center justify-center">
@@ -300,7 +300,7 @@ export const TrackerView: React.FC<TrackerViewProps> = ({
                 </div>
                 <div className="flex-1 flex items-center justify-center gap-2 text-stone-300">
                     <ChevronRight size={12} />
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em]">记录 (Actual)</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] whitespace-nowrap">记录</span>
                 </div>
             </div>
         </div>
